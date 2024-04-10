@@ -3,7 +3,7 @@ int dacpin1 = DAC1; // pin 17 on ESP
 int dacpin2 = DAC2; // pin 18 on ESP
 int input_re_lock_flag = 39; // This (slave) uC listens to this pin and when it goes high it starts generating re-locking wavefroms. When the pin is low it does not generate re-lock wavefroms.
 int input_ramp_flag = 38; // This (slave) uC listens to this pin and when it goes high it starts generating ramping waveform for the LD. When the pin is low it does not generate the ramping wavefrom.
-int osci_trigger = 37;
+int osci_trigger = 41;
 
 float amplitude1 = 0.3; // Amplitude of the fast sine function, 0.3 correpsonds to 1V DAC ouput
 float DC_offset1 = 193; //Offset of the fast sine function is 2.5V, (2.5/3.3)*256
@@ -15,7 +15,6 @@ const int num_amp_steps = 5; //Number of slow sine amplitude steps
 float amp_incr = amplitude2_max/num_amp_steps;
 float amplitude2 = amp_incr; //Starting amplitude of the slow sine is equal to amp_incr
 
-float amplitude_ramp = 0.1;
 int ramp_amp;
 
 hw_timer_t *timer = timerBegin(1, 80, true);  // Timer 1, prescaler 80, count up
@@ -23,17 +22,12 @@ hw_timer_t *timer = timerBegin(1, 80, true);  // Timer 1, prescaler 80, count up
 // Sine LookUpTable & Index Variable
 int SampleIdx1 = 0; // Index for going through the fast sine function
 int SampleIdx2 = 0; // Index for going throuhg the slow sine function
-int SampleIdx3 = 0; // Index fro going through the ramp waveform
+int SampleIdx3 = 0; // Index for going through the ramp waveform
 
 boolean toogle = true; // toogle for the oscilloscope ramp trigger
 
-const int ramp60LookupTable[] = { //Lookup table for the ramp, this is going to be applied to the LD
-       -127, -123, -119, -115, -110, -106, -102,  -97,  -93,  -89,  -84,
-        -80,  -76,  -71,  -67,  -63,  -58,  -54,  -50,  -45,  -41,  -37,
-        -32,  -28,  -24,  -19,  -15,  -11,   -6,   -2,    2,    6,   11,
-         15,   19,   24,   28,   32,   37,   41,   45,   50,   54,   58,
-         63,   67,   71,   76,   80,   84,   89,   93,   97,  102,  106,
-        110,  115,  119,  123,  128};
+const int ramp10LookupTable[] = { //Lookup table for the ramp, this is going to be applied to the LD
+       -127,  -99,  -71,  -42,  -14,   14,   43,   71,   99,  128};
 
 const int sine30LookupTable[] = { //Lookup table for the fast sine function, this is going to be applied the path length piezo
    1,   28,   54,   78,   98,  114,  124,  128,  127,  119,  106,
@@ -159,18 +153,16 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
         amplitude2 = amp_incr;
         amp_incr_cnt = 0;
         }
-      
-      
     }
     dacWrite(dacpin1, ramp_amp1); // applied to the path length piezo
     dacWrite(dacpin2, ramp_amp2); // applied to the LD
     
   }else if(digitalRead(input_ramp_flag) == HIGH){
-    ramp_amp = int(ramp60LookupTable[SampleIdx3++]*0.05+DC_offset2); // Going through the ramp values
-    if(SampleIdx3 == 60){
+    ramp_amp = int(ramp10LookupTable[SampleIdx3++]*0.15+DC_offset2); // Going through the ramp values
+    if(SampleIdx3 == 10){
       SampleIdx3 = 0;
       toogle = !toogle;
-      digitalWrite(osci_trigger, toogle);
+      digitalWrite(osci_trigger, toogle); // Generating a sync trigger signal for the oscilloscope
     }
     if(ramp_amp > 255){
       ramp_amp = 255;
