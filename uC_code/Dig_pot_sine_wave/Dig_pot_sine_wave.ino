@@ -20,8 +20,8 @@
 
 
 #define VSPI_MISO   21 //SDO
-#define VSPI_MOSI   33 //SDI
-#define VSPI_SCLK   34
+#define VSPI_MOSI   47 //SDI
+#define VSPI_SCLK   48
 #define VSPI_SS     45
 
 
