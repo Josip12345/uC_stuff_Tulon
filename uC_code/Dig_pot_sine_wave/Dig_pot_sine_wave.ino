@@ -60,12 +60,15 @@ vspi->begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI, VSPI_SS); //SCLK, MISO, MOSI, SS
 
 }
 
+int val = 0;
 // the loop function runs over and over again until power down or reset
 void loop() {
   //while (i<10){
   //use the SPI buses
   //Serial.println(sine30LookupTable[i++]);
-  spiCommand(vspi, 00, sine30LookupTable[i++]*0.1);
+  val = sine30LookupTable[i++]*0.2+56;
+  spiCommand(vspi, 00, val);
+  spiCommand(vspi, 0b00010000, val);
   if (i==30){
     i=0;
     }; 
