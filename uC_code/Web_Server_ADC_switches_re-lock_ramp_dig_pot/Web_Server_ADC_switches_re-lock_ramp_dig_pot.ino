@@ -27,8 +27,8 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 // ESP ADC channels used for monitoring laser transmission signals
-const int ADC1_CH5 = 8; // PD laser 1
-const int ADC1_CH6 = 10; // PD laser 2
+const int ADC1_CH5 = 46; // PD laser 1
+const int ADC1_CH6 = 8; // PD laser 2
 
 // Relay bank 1 set pins
 const int relay11 = 19; //laser 1, integrator piezo 1 (IP1)
@@ -211,7 +211,7 @@ const int sine900LookupTable[] = { 1,    1,    2,    3,    4,    5,    6,    7, 
 void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
   if (re_lock_gen_flag_laser2 == 1){ // If re_lock_gen_flag_laser2 == 1 means that the relock waveforms should be outputed
 // Send SineTable Values To DAC One By One
-
+  
   ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser2++]*0.1+100); // Going thorught the fast sine values
   ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser2++]*0.1+100); // Going thorught the fast sine values
   // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
@@ -243,7 +243,7 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
   spiCommand(vspi, 00, ramp_amp1);
   spiCommand(vspi, 0b00010000, ramp_amp2);
   }
-  
+
   if(ramp_gen_flag_laser2 == 1){ 
     ramp_amp = int(ramp10LookupTable[SampleIdx3_laser2++]*0.15+DC_offset2); // Going through the ramp values
     if(SampleIdx3_laser2 == 10){
@@ -497,7 +497,7 @@ void setup() {
   digitalWrite(relay23, HIGH);
   digitalWrite(relay24, HIGH);
 
-  timer1_setup(2000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
+  timer1_setup(20000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
 
   delay(1000);
 
