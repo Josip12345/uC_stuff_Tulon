@@ -90,7 +90,7 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 float amplitude1 = 0.25; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V
 float DC_offset1 = 56; //Some calibrated value for the offset
-float amplitude2_max = 0.05; // Amplitude of the slow sine function, this value is calibrated for pp LD voltage of 250mV DAC
+float amplitude2_max = 0.4; // Amplitude of the slow sine function, calibrated for 200mV pp at the LD, with the 1.5kohm shunt resistor 
 float DC_offset2 = 56; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
@@ -212,8 +212,8 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
   if (re_lock_gen_flag_laser2 == 1){ // If re_lock_gen_flag_laser2 == 1 means that the relock waveforms should be outputed
 // Send SineTable Values To DAC One By One
   
-  ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser2++]*0.1+100); // Going thorught the fast sine values
-  ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser2++]*0.1+100); // Going thorught the fast sine values
+  ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser2++]*amplitude1+DC_offset1); // Going thorught the fast sine values
+  ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser2++]*amplitude2+DC_offset2); // Going thorught the slow sine values
   // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
   
   if(ramp_amp1 > 255){
@@ -240,8 +240,9 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
       amp_incr_cnt = 0;
       }
   }
-  spiCommand(vspi, 00, ramp_amp1);
   spiCommand(vspi, 0b00010000, ramp_amp2);
+  spiCommand(vspi, 00, ramp_amp1);
+  
   }
 
   if(ramp_gen_flag_laser2 == 1){ 
@@ -497,7 +498,7 @@ void setup() {
   digitalWrite(relay23, HIGH);
   digitalWrite(relay24, HIGH);
 
-  timer1_setup(20000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
+  timer1_setup(5000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
 
   delay(1000);
 
