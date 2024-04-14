@@ -66,12 +66,18 @@ int ramp_gen_flag_laser2 = 0; // This flag indicates to the timer interrupt rout
 #define VSPI_SCLK   11
 #define VSPI_SS     10
 
+#define HSPI_MISO   18 //SDO
+#define HSPI_MOSI   17 //SDI
+#define HSPI_SCLK   16
+#define HSPI_SS     15
+
 #define VSPI FSPI
 
 static const int spiClk = 10000000; // 10 MHz
 
 //uninitalised pointers to SPI objects
 SPIClass * vspi = NULL;
+SPIClass * hspi = NULL;
 
 void spiCommand(SPIClass *spi, byte data1, byte data2) {
   //use it as you would the regular arduino SPI API
@@ -209,6 +215,62 @@ const int sine900LookupTable[] = { 1,    1,    2,    3,    4,    5,    6,    7, 
          -7,   -6,   -5,   -4,   -3,   -2,   -1,    0,    0};
 
 void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
+  
+///// LASER 1
+////////////
+  if (re_lock_gen_flag_laser1 == 1){ // If re_lock_gen_flag_laser2 == 1 means that the relock waveforms should be outputed
+// Send SineTable Values To DAC One By One
+  
+  ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser1++]*amplitude1+DC_offset1); // Going thorught the fast sine values
+  ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2); // Going thorught the slow sine values
+  // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
+  
+  if(ramp_amp1 > 255){
+    ramp_amp1 = 255;
+  }else if (ramp_amp1 < 0){
+    ramp_amp1 = 0;
+  }
+  if(SampleIdx1_laser1 == 30){
+    SampleIdx1_laser1 = 0;
+  }
+  
+  if(ramp_amp2 > 255){
+    ramp_amp2 = 255;
+  }else if (ramp_amp2 < 0){
+    ramp_amp2 = 0;
+  }
+  
+  if(SampleIdx2_laser1 == 900){
+    SampleIdx2_laser1 = 0;
+    amplitude2 = amplitude2 + amp_incr;
+    amp_incr_cnt++;
+    if (amp_incr_cnt == num_amp_steps){
+      amplitude2 = amp_incr;
+      amp_incr_cnt = 0;
+      }
+  }
+  spiCommand(hspi, 00, ramp_amp2); // The slow (LD) relock waveform goes to port A of the dig trimpot 1
+  spiCommand(vspi, 00, ramp_amp1); // The fast (piezo) relock waveform goes to port A of the dig trimpot 2
+  }
+
+  
+  if(ramp_gen_flag_laser1 == 1){ 
+    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.15+DC_offset2); // Going through the ramp values
+    if(SampleIdx3_laser1 == 10){
+      SampleIdx3_laser1 = 0;
+      toogle_laser1 = !toogle_laser1;
+      digitalWrite(osci_trigger_laser1, toogle_laser1); // Generating a sync trigger signal for the oscilloscope
+    }
+    if(ramp_amp > 255){
+      ramp_amp = 255;
+    }else if (ramp_amp < 0){
+      ramp_amp = 0;
+    }
+    spiCommand(hspi, 00, ramp_amp); // The ramps waveform goes to port A of the dig trimpot 1 (LD)
+ }
+
+///// LASER 2
+/////////////  
   if (re_lock_gen_flag_laser2 == 1){ // If re_lock_gen_flag_laser2 == 1 means that the relock waveforms should be outputed
 // Send SineTable Values To DAC One By One
   
@@ -240,10 +302,11 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
       amp_incr_cnt = 0;
       }
   }
-  spiCommand(vspi, 0b00010000, ramp_amp2);
-  spiCommand(vspi, 00, ramp_amp1);
-  
+  spiCommand(hspi, 0b00010000, ramp_amp2); // The slow relock waveform goes to port B  of the dig trimpot 1 (LD)
+  spiCommand(vspi, 0b00010000, ramp_amp1); // The fast  relock waveform goes to port B  of the dig trimpot 2 (piezo)
   }
+
+
 
   if(ramp_gen_flag_laser2 == 1){ 
     ramp_amp = int(ramp10LookupTable[SampleIdx3_laser2++]*0.15+DC_offset2); // Going through the ramp values
@@ -257,8 +320,7 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
     }else if (ramp_amp < 0){
       ramp_amp = 0;
     }
-    spiCommand(vspi, 00, ramp_amp); // applied to the LD
-    spiCommand(vspi, 0b00010000, ramp_amp); // applied to the LD
+    spiCommand(hspi, 0b00010000, ramp_amp); // The ramp waveform goes to port B of the dig trimpot 1 (LD)
  }
 }
 
@@ -466,13 +528,16 @@ void initWebSocket() {
 
 
 void setup() {
-  //initialise the instance of the SPIClass attached to VSPI
+  //initialise the instance of the SPIClasses
   vspi = new SPIClass(VSPI);
+  hspi = new SPIClass(HSPI);
   // route through GPIO pins of your choice
   vspi->begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI, VSPI_SS); //SCLK, MISO, MOSI, SS
+  hspi->begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, HSPI_SS); //SCLK, MISO, MOSI, SS
   //set up slave select pins as outputs as the Arduino API
   //doesn't handle automatically pulling SS low
   pinMode(vspi->pinSS(), OUTPUT); //VSPI SS
+  pinMode(hspi->pinSS(), OUTPUT); //HSPI SS
   
   Serial.begin(115200);
   // Set relay control pins 
