@@ -32,20 +32,19 @@ const int sine30LookupTable[] = { // Lookup table for the fast sine function
 
 int i=0;
 
-#if CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3
+
 #define VSPI FSPI
-#endif
+
 
 static const int spiClk = 10000000; // 10 MHz
 
 //uninitalised pointers to SPI objects
 SPIClass * vspi = NULL;
-SPIClass * hspi = NULL;
+
 
 void setup() {
   //initialise two instances of the SPIClass attached to VSPI and HSPI respectively
   vspi = new SPIClass(VSPI);
-  hspi = new SPIClass(HSPI);
   Serial.begin(115200);
   
 

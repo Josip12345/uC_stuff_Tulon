@@ -8,7 +8,7 @@
   The above copyright notice and this permission notice shall be included in all
   copies or substantial portions of the Software.
 */
-
+#include <SPI.h>
 #include <Arduino.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
@@ -27,14 +27,14 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 // ESP ADC channels used for monitoring laser transmission signals
-const int ADC1_CH5 = 6; // PD laser 1
-const int ADC1_CH6 = 7; // PD laser 2
+const int ADC1_CH5 = 8; // PD laser 1
+const int ADC1_CH6 = 10; // PD laser 2
 
 // Relay bank 1 set pins
-const int relay11 = 12; //laser 1, integrator piezo 1 (IP1)
-const int relay12 = 11; //laser 1, integrator piezo 2 (IP2)
-const int relay13 = 10; //laser 1, integrator LD 1 (IL1)
-const int relay14 = 9; //laser 1, integrator LD 2 (IL2)
+const int relay11 = 19; //laser 1, integrator piezo 1 (IP1)
+const int relay12 = 21; //laser 1, integrator piezo 2 (IP2)
+const int relay13 = 33; //laser 1, integrator LD 1 (IL1)
+const int relay14 = 34; //laser 1, integrator LD 2 (IL2)
 // Relay bank 2 set pins
 const int relay21 = 35; //laser 2, integrator piezo 1 (IP1)
 const int relay22 = 36; //laser 2, integrator piezo 2 (IP2)
@@ -42,8 +42,8 @@ const int relay23 = 37; //laser 2, integrator LD 1 (IL1)
 const int relay24 = 38; //laser 2, integrator LD 2 (IL2)
 
  
-int osci_trigger_laser1 = 41; 
-int osci_trigger_laser2 = 42;
+int osci_trigger_laser1 = 5; 
+int osci_trigger_laser2 = 6;
 
 // Variable for storing laser transmission values obtained by ESP ADCs
 int Value_laser1 = 0;
@@ -60,18 +60,46 @@ int ramp_gen_flag_laser2 = 0; // This flag indicates to the timer interrupt rout
 
 //////////For relock
 
+// Some defintions for SPI bus connecting the dig pot to the microcontroller
+#define VSPI_MISO   13 //SDO
+#define VSPI_MOSI   12 //SDI
+#define VSPI_SCLK   11
+#define VSPI_SS     10
+
+#define VSPI FSPI
+
+static const int spiClk = 10000000; // 10 MHz
+
+//uninitalised pointers to SPI objects
+SPIClass * vspi = NULL;
+
+void spiCommand(SPIClass *spi, byte data1, byte data2) {
+  //use it as you would the regular arduino SPI API
+  spi->beginTransaction(SPISettings(spiClk, MSBFIRST, SPI_MODE0));
+  digitalWrite(spi->pinSS(), LOW); //pull SS slow to prep other end for transfer
+  spi->transfer(data1); 
+  // The digital potentiometer MCP4231 wants 16 bits of data for the write command and it
+  // works if we send them as two separate bytes, like this
+  spi->transfer(data2);
+  digitalWrite(spi->pinSS(), HIGH); //pull ss high to signify end of data transfer
+  spi->endTransaction();
+}
 
 
-float amplitude1 = 0.3; // Amplitude of the fast sine function, 0.3 correpsonds to 1V DAC ouput
-float DC_offset1 = 193; //Offset of the fast sine function is 2.5V, (2.5/3.3)*256
-float amplitude2_max = 0.06; // Amplitude of the slow sine function, 0.06 correpsonds to 200mV DAC ouput
-float DC_offset2 = 193; //Offset of the slow sine function is 2.5V, (2.5/3.3)*256
+
+
+float amplitude1 = 0.25; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V
+float DC_offset1 = 56; //Some calibrated value for the offset
+float amplitude2_max = 0.05; // Amplitude of the slow sine function, this value is calibrated for pp LD voltage of 250mV DAC
+float DC_offset2 = 56; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
 const int num_amp_steps = 5; //Number of slow sine amplitude steps
 float amp_incr = amplitude2_max/num_amp_steps;
 float amplitude2 = amp_incr; //Starting amplitude of the slow sine is equal to amp_incr
 hw_timer_t *timer = timerBegin(1, 80, true);  // Timer 1, prescaler 80, count up
+int ramp_amp1;
+int ramp_amp2;
 int ramp_amp;
 
 // Sine LookUpTable & Index Variable
@@ -181,12 +209,11 @@ const int sine900LookupTable[] = { 1,    1,    2,    3,    4,    5,    6,    7, 
          -7,   -6,   -5,   -4,   -3,   -2,   -1,    0,    0};
 
 void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
-  if (re_lock_gen_flag_laser2 == 1){ // If re_lock_gen_flag_laser2 1 means that the relock waveforms should be outputed
+  if (re_lock_gen_flag_laser2 == 1){ // If re_lock_gen_flag_laser2 == 1 means that the relock waveforms should be outputed
 // Send SineTable Values To DAC One By One
-  int ramp_amp1;
-  int ramp_amp2;
-  ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser2++]*amplitude1+DC_offset1); // Going thorught the fast sine values
-  ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser2++]*amplitude2+DC_offset2); // Going thorught the fast sine values
+
+  ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser2++]*0.1+100); // Going thorught the fast sine values
+  ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser2++]*0.1+100); // Going thorught the fast sine values
   // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
   
   if(ramp_amp1 > 255){
@@ -212,12 +239,9 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
       amplitude2 = amp_incr;
       amp_incr_cnt = 0;
       }
-    
-    
   }
-  dacWrite(dacpin1, ramp_amp1);
-  dacWrite(dacpin2, ramp_amp2);
-  
+  spiCommand(vspi, 00, ramp_amp1);
+  spiCommand(vspi, 0b00010000, ramp_amp2);
   }
   
   if(ramp_gen_flag_laser2 == 1){ 
@@ -232,7 +256,8 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
     }else if (ramp_amp < 0){
       ramp_amp = 0;
     }
-    dacWrite(dacpin2, ramp_amp); // applied to the LD
+    spiCommand(vspi, 00, ramp_amp); // applied to the LD
+    spiCommand(vspi, 0b00010000, ramp_amp); // applied to the LD
  }
 }
 
@@ -440,6 +465,14 @@ void initWebSocket() {
 
 
 void setup() {
+  //initialise the instance of the SPIClass attached to VSPI
+  vspi = new SPIClass(VSPI);
+  // route through GPIO pins of your choice
+  vspi->begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI, VSPI_SS); //SCLK, MISO, MOSI, SS
+  //set up slave select pins as outputs as the Arduino API
+  //doesn't handle automatically pulling SS low
+  pinMode(vspi->pinSS(), OUTPUT); //VSPI SS
+  
   Serial.begin(115200);
   // Set relay control pins 
   pinMode(relay11, OUTPUT);
@@ -488,12 +521,12 @@ void setup() {
 void loop() {
 
   // Reading potentiometer value
-  Value_laser2 = analogRead(ADC1_CH4);
-  Value_laser2 = analogRead(ADC1_CH4);
-  Value_laser2 = analogRead(ADC1_CH4);
-  Value_laser1 = analogRead(ADC1_CH2);
-  Value_laser1 = analogRead(ADC1_CH2);
-  Value_laser1 = analogRead(ADC1_CH2);
+  Value_laser2 = analogRead(ADC1_CH6);
+  Value_laser2 = analogRead(ADC1_CH6);
+  Value_laser2 = analogRead(ADC1_CH6);
+  Value_laser1 = analogRead(ADC1_CH5);
+  Value_laser1 = analogRead(ADC1_CH5);
+  Value_laser1 = analogRead(ADC1_CH5);
 
 
   //Serial.println(Value_laser1);
