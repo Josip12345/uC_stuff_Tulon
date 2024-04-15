@@ -94,9 +94,9 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 
 
-float amplitude1 = 0.25; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V
+float amplitude1 = 0.1; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V
 float DC_offset1 = 56; //Some calibrated value for the offset
-float amplitude2_max = 0.4; // Amplitude of the slow sine function, calibrated for 200mV pp at the LD, with the 1.5kohm shunt resistor 
+float amplitude2_max = 0.8; // Amplitude of the slow sine function, calibrated for 200mV pp at the LD, with the 1.5kohm shunt resistor 
 float DC_offset2 = 56; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
@@ -255,7 +255,7 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
 
   
   if(ramp_gen_flag_laser1 == 1){ 
-    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.15+DC_offset2); // Going through the ramp values
+    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.7+127); // Going through the ramp values
     if(SampleIdx3_laser1 == 10){
       SampleIdx3_laser1 = 0;
       toogle_laser1 = !toogle_laser1;
@@ -309,7 +309,7 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
 
 
   if(ramp_gen_flag_laser2 == 1){ 
-    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser2++]*0.15+DC_offset2); // Going through the ramp values
+    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser2++]*0.7+127); // Going through the ramp values
     if(SampleIdx3_laser2 == 10){
       SampleIdx3_laser2 = 0;
       toogle_laser2 = !toogle_laser2;
