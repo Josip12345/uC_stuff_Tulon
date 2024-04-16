@@ -27,7 +27,7 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 // ESP ADC channels used for monitoring laser transmission signals
-const int ADC1_CH5 = 46; // PD laser 1
+const int ADC1_CH5 = 9; // PD laser 1
 const int ADC1_CH6 = 8; // PD laser 2
 
 // Relay bank 1 set pins
