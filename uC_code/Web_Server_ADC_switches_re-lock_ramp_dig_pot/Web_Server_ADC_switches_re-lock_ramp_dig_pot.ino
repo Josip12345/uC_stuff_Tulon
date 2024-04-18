@@ -27,7 +27,7 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 // ESP ADC channels used for monitoring laser transmission signals
-const int ADC1_CH5 = 9; // PD laser 1
+const int ADC1_CH5 = 10; // PD laser 1
 const int ADC1_CH6 = 8; // PD laser 2
 
 // Relay bank 1 set pins
@@ -62,9 +62,9 @@ int ramp_gen_flag_laser2 = 0; // This flag indicates to the timer interrupt rout
 
 // Some defintions for SPI bus connecting the dig pot to the microcontroller
 #define VSPI_MISO   13 //SDO
-#define VSPI_MOSI   12 //SDI
-#define VSPI_SCLK   11
-#define VSPI_SS     10
+#define VSPI_MOSI   42 //SDI
+#define VSPI_SCLK   41
+#define VSPI_SS     40
 
 #define HSPI_MISO   18 //SDO
 #define HSPI_MOSI   17 //SDI
@@ -94,9 +94,9 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 
 
-float amplitude1 = 0.1; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V
+float amplitude1 = 0.25; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V
 float DC_offset1 = 56; //Some calibrated value for the offset
-float amplitude2_max = 0.8; // Amplitude of the slow sine function, calibrated for 200mV pp at the LD, with the 1.5kohm shunt resistor 
+float amplitude2_max = 0.2; // Amplitude of the slow sine function, calibrated for 200mV pp at the LD, with the 1.5kohm shunt resistor 
 float DC_offset2 = 56; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
@@ -255,7 +255,7 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
 
   
   if(ramp_gen_flag_laser1 == 1){ 
-    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.7+127); // Going through the ramp values
+    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.7+DC_offset2); // Going through the ramp values
     if(SampleIdx3_laser1 == 10){
       SampleIdx3_laser1 = 0;
       toogle_laser1 = !toogle_laser1;
@@ -309,7 +309,7 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
 
 
   if(ramp_gen_flag_laser2 == 1){ 
-    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser2++]*0.7+127); // Going through the ramp values
+    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser2++]*0.7+DC_offset2); // Going through the ramp values
     if(SampleIdx3_laser2 == 10){
       SampleIdx3_laser2 = 0;
       toogle_laser2 = !toogle_laser2;
@@ -563,7 +563,7 @@ void setup() {
   digitalWrite(relay23, HIGH);
   digitalWrite(relay24, HIGH);
 
-  timer1_setup(5000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
+  timer1_setup(10000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
 
   delay(1000);
 
@@ -615,13 +615,13 @@ if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage 
     re_lock_gen_flag_laser1 = 0; // Indicate to the timer interrupt routine to stop generating relock waveforms on laser 1
     // Order of engaging integrators matters!
     digitalWrite(relay12, LOW);  //laser 1, integrator piezo 2 (IP2)
-    delay(200);
+    delay(20);
     digitalWrite(relay11, LOW);  //laser 1, integrator piezo 1 (IP1)
-    delay(200);
+    delay(20);
     digitalWrite(relay13, LOW);  //laser 1, integrator LD 1 (IL1)
-    delay(200);
+    delay(20);
     digitalWrite(relay14, LOW);  //laser 1, integrator LD 2 (IL2)
-    delay(200);
+    delay(20);
     }
     
    if (Value_laser1 < threshold_disengage1){
@@ -654,13 +654,13 @@ if (engage_relock_track_laser2 == 1){ //Go to lock tracking only if the "Engage 
     re_lock_gen_flag_laser2 = 0; // Stop generating relock waveforms
     // Order of engaging integrators matters!
     digitalWrite(relay22, LOW); //GPIO32, laser 2, integrator piezo 2 (IP2)
-    delay(200);
+    delay(20);
     digitalWrite(relay21, LOW); //GPIO31, laser 2, integrator piezo 1 (IP1)
-    delay(200);
+    delay(20);
     digitalWrite(relay23, LOW); //GPIO33, laser 2, integrator LD 1 (IL1)
-    delay(200);
+    delay(20);
     digitalWrite(relay24, LOW); //GPIO34, laser 2, integrator LD 2 (IL2)
-    delay(200);
+    delay(20);
     }
     
    if (Value_laser2 < threshold_disengage2){
