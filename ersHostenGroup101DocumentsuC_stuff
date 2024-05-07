@@ -1,0 +1,24 @@
+[1mdiff --git a/uC_code/Web_Server_ADC_switches_re-lock_ramp_dig_pot/Web_Server_ADC_switches_re-lock_ramp_dig_pot.ino b/uC_code/Web_Server_ADC_switches_re-lock_ramp_dig_pot/Web_Server_ADC_switches_re-lock_ramp_dig_pot.ino[m
+[1mindex a2e2a95..58a5af0 100644[m
+[1m--- a/uC_code/Web_Server_ADC_switches_re-lock_ramp_dig_pot/Web_Server_ADC_switches_re-lock_ramp_dig_pot.ino[m
+[1m+++ b/uC_code/Web_Server_ADC_switches_re-lock_ramp_dig_pot/Web_Server_ADC_switches_re-lock_ramp_dig_pot.ino[m
+[36m@@ -96,8 +96,8 @@[m [mvoid spiCommand(SPIClass *spi, byte data1, byte data2) {[m
+ [m
+ float amplitude1 = 0.25; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V[m
+ float DC_offset1 = 56; //Some calibrated value for the offset[m
+[31m-float amplitude2_max = 0.2; // Amplitude of the slow sine function, calibrated for 200mV pp at the LD, with the 1.5kohm shunt resistor [m
+[31m-float DC_offset2 = 56; //Some calibrated value for the offset[m
+[32m+[m[32mfloat amplitude2_max = 0.2; // Amplitude of the slow sine function[m
+[32m+[m[32mfloat DC_offset2 = 80; //Some calibrated value for the offset[m
+ int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the [m
+ //lock condition is found[m
+ const int num_amp_steps = 5; //Number of slow sine amplitude steps[m
+[36m@@ -563,7 +563,7 @@[m [mvoid setup() {[m
+   digitalWrite(relay23, HIGH);[m
+   digitalWrite(relay24, HIGH);[m
+ [m
+[31m-  timer1_setup(10000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz[m
+[32m+[m[32m  timer1_setup(10000); // 10 is 2ms interval; like this sine with 30 points is around 10Hz and the one with 900 points is around <0.5 Hz[m
+ [m
+   delay(1000);[m
+ [m
