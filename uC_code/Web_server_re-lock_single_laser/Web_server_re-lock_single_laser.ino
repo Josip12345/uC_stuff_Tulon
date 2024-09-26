@@ -1,4 +1,4 @@
-/* 
+  /* 
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/esp32-web-server-websocket-sliders/
   
@@ -8,7 +8,7 @@
   The above copyright notice and this permission notice shall be included in all
   copies or substantial portions of the Software.
 */
-
+#include <SPI.h>
 #include <Arduino.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
@@ -17,7 +17,7 @@
 #include <Arduino_JSON.h>
 
 // Replace with your network credentials
-const char* ssid = "LockTrack2";
+const char* ssid = "LockTrack";
 const char* password = "";
 
 // Create AsyncWebServer object on port 80
@@ -27,52 +27,94 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 // ESP ADC channels used for monitoring laser transmission signals
-const int ADC1_CH2 = 8; // PD laser 1
-const int ADC1_CH4 = 10; // PD laser 2
-
+const int ADC1_CH5 = 10; // PD laser 1
 // Relay bank 1 set pins
-const int relay11 = 19; //GPIO15
-const int relay12 = 21; //GPIO14
-const int relay13 = 33; //GPIO29
-const int relay14 = 34; //GPIO30
-// Relay bank 2 set pins
-const int relay21 = 35; //GPIO31
-const int relay22 = 36; //GPIO32
-const int relay23 = 37; //GPIO33
-const int relay24 = 38; //GPIO34
+const int relay11 = 19; //integrator piezo 1 (IP1)
+const int relay12 = 21; //integrator piezo 2 (IP2)
+const int relay13 = 33; //integrator LD 1 (IL1)
+const int relay14 = 34; //integrator LD 2 (IL2)
+
+
+ 
+int osci_trigger_laser1 = 5; 
 
 // Variable for storing laser transmission values obtained by ESP ADCs
 int Value_laser1 = 0;
-int Value_laser2 = 0;
+
 unsigned long timer_off_lock_laser1 = 0;
-unsigned long timer_off_lock_laser2 = 0;
+
+
+int re_lock_gen_flag_laser1 = 0; // This flag indicates to the timer interrupt routine that relock waveforms should be outputed for laser 1; (if it has a value of 1) or not (if it has the value of 0)
+int ramp_gen_flag_laser1 = 0; // This flag indicates to the timer interrupt routine that it should generate the ramp waveform for the laser 1; (if it has a value of 1) or not (if it has the value of 0)
+
+
+
+//////////For relock
+
+// Some defintions for SPI bus connecting the dig pot to the microcontroller
+// Piezo
+#define VSPI_MISO   13 //SDO
+#define VSPI_MOSI   42 //SDI
+#define VSPI_SCLK   41
+#define VSPI_SS     40
+
+// LD
+#define HSPI_MISO   18 //SDO
+#define HSPI_MOSI   17 //SDI
+#define HSPI_SCLK   16
+#define HSPI_SS     15
+
+#define VSPI FSPI
+
+static const int spiClk = 10000000; // 10 MHz
+
+//uninitalised pointers to SPI objects
+SPIClass * vspi = NULL;
+SPIClass * hspi = NULL;
+
+void spiCommand(SPIClass *spi, byte data1, byte data2) {
+  //use it as you would the regular arduino SPI API
+  spi->beginTransaction(SPISettings(spiClk, MSBFIRST, SPI_MODE0));
+  digitalWrite(spi->pinSS(), LOW); //pull SS slow to prep other end for transfer
+  spi->transfer(data1); 
+  // The digital potentiometer MCP4231 wants 16 bits of data for the write command and it
+  // works if we send them as two separate bytes, like this
+  spi->transfer(data2);
+  digitalWrite(spi->pinSS(), HIGH); //pull ss high to signify end of data transfer
+  spi->endTransaction();
+}
 
 
 
 
-
-
-
-
-//////////For re-lock
-/////////////////////
-int dacpin1 = DAC1;
-int dacpin2 = DAC2;
-
-float amplitude1 = 0.3; // Amplitude of the fast sine function, 0.3 correpsonds to 1V DAC ouput
-float DC_offset1 = 193; //Offset of the fast sine function is 2.5V, (2.5/3.3)*256
-float amplitude2_max = 0.3; // Amplitude of the slow sine function, 0.3 correpsonds to 1V DAC ouput
-float DC_offset2 = 193; //Offset of the slow sine function is 2.5V, (2.5/3.3)*256
+float amplitude1 = 0.05; // Amplitude of the fast sine function, this gives 4Vpp with the PF PCB setting atm 
+float DC_offset1 = 56; //Some calibrated value for the offset
+float amplitude2_max = 0.04; // Amplitude of the slow sine function
+float DC_offset2 = 56; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
 const int num_amp_steps = 5; //Number of slow sine amplitude steps
 float amp_incr = amplitude2_max/num_amp_steps;
 float amplitude2 = amp_incr; //Starting amplitude of the slow sine is equal to amp_incr
 hw_timer_t *timer = timerBegin(1, 80, true);  // Timer 1, prescaler 80, count up
+int ramp_amp1;
+int ramp_amp2;
+int ramp_amp;
 
 // Sine LookUpTable & Index Variable
-int SampleIdx1 = 0; // Index for going through the fast sine function
-int SampleIdx2 = 0; // Index for going throuhg the slow sine function
+int SampleIdx1_laser1 = 0; // Index for going through the fast sine function
+int SampleIdx2_laser1 = 0; // Index for going throuhg the slow sine function 
+int SampleIdx3_laser1 = 0; // Index for going through the ramp waveform
+
+
+
+
+boolean toogle_laser1 = true; // toogle_laser1 for the oscilloscope ramp trigger
+
+
+
+const int ramp10LookupTable[] = { //Lookup table for the ramp, this is going to be applied to the LD
+       -127,  -99,  -71,  -42,  -14,   14,   43,   71,   99,  128};
 
 const int sine30LookupTable[] = { // Lookup table for the fast sine function
    1,   28,   54,   78,   98,  114,  124,  128,  127,  119,  106,
@@ -164,11 +206,14 @@ const int sine900LookupTable[] = { 1,    1,    2,    3,    4,    5,    6,    7, 
          -7,   -6,   -5,   -4,   -3,   -2,   -1,    0,    0};
 
 void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
+  
+///// LASER 1
+////////////
+  if (re_lock_gen_flag_laser1 == 1){ // If re_lock_gen_flag_laser1 == 1 means that the relock waveforms should be outputed
 // Send SineTable Values To DAC One By One
-  int ramp_amp1;
-  int ramp_amp2;
-  ramp_amp1 = int(sine30LookupTable[SampleIdx1++]*amplitude1+DC_offset1); // Going thorught the fast sine values
-  ramp_amp2 = int(sine900LookupTable[SampleIdx2++]*amplitude2+DC_offset2); // Going thorught the fast sine values
+  
+  ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser1++]*amplitude1+DC_offset1); // Going thorught the fast sine values
+  ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2); // Going thorught the slow sine values
   // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
   
   if(ramp_amp1 > 255){
@@ -176,8 +221,8 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
   }else if (ramp_amp1 < 0){
     ramp_amp1 = 0;
   }
-  if(SampleIdx1 == 30){
-    SampleIdx1 = 0;
+  if(SampleIdx1_laser1 == 30){
+    SampleIdx1_laser1 = 0;
   }
   
   if(ramp_amp2 > 255){
@@ -186,19 +231,35 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
     ramp_amp2 = 0;
   }
   
-  if(SampleIdx2 == 900){
-    SampleIdx2 = 0;
+  if(SampleIdx2_laser1 == 900){
+    SampleIdx2_laser1 = 0;
     amplitude2 = amplitude2 + amp_incr;
     amp_incr_cnt++;
     if (amp_incr_cnt == num_amp_steps){
       amplitude2 = amp_incr;
       amp_incr_cnt = 0;
       }
-    
-    
   }
-  dacWrite(dacpin1, ramp_amp1);
-  dacWrite(dacpin2, ramp_amp2);
+  spiCommand(hspi, 00, ramp_amp2); // The slow (LD) relock waveform goes to port A of the dig trimpot 1
+  spiCommand(vspi, 00, ramp_amp1); // The fast (piezo) relock waveform goes to port A of the dig trimpot 2
+  }
+
+  
+  if(ramp_gen_flag_laser1 == 1){ 
+    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.7+DC_offset2); // Going through the ramp values
+    if(SampleIdx3_laser1 == 10){
+      SampleIdx3_laser1 = 0;
+      toogle_laser1 = !toogle_laser1;
+      digitalWrite(osci_trigger_laser1, toogle_laser1); // Generating a sync trigger signal for the oscilloscope
+    }
+    if(ramp_amp > 255){
+      ramp_amp = 255;
+    }else if (ramp_amp < 0){
+      ramp_amp = 0;
+    }
+    spiCommand(hspi, 00, ramp_amp); // The ramps waveform goes to port A of the dig trimpot 1 (LD)
+ }
+ 
 }
 
 void timer1_setup(uint32_t interval) {
@@ -210,9 +271,8 @@ void timer1_setup(uint32_t interval) {
   // Set the timer to repeat every 'interval' microseconds
   timerAlarmWrite(timer, interval, true);
 
-  // Disable the timer initially
-  timerAlarmDisable(timer);
-  //timerAlarmEnable(timer);
+  
+  timerAlarmEnable(timer);
 }
 
 
@@ -234,19 +294,24 @@ int threshold_disengage1 = Volt_to_number_8*0.8; // Integrators disengaged below
                                                // Like this we have needed hysteresis
 
 
-int threshold_engage2 = Volt_to_number_10*1.5; // Integrators engaged above PD value of 1.5 V
-int threshold_disengage2 = Volt_to_number_10*1.2; // Integrators disengaged below a PD value of 1.2 V
-                                               // Like this we have needed hysteres 
-
-                                              
+                                           
 
 String message = "";
 String sliderValue1 = "0";
 String sliderValue2 = "0";
 String sliderValue3 = "0";
 String sliderValue4 = "0";
-String switchString = "0";
-int switchStatus = 0;
+String elp = "0";
+
+int engage_relock_track_laser1 = 0; // This flag determines if the laser 1 lock status should be tracked. Does not imply outputing relock waveforms.
+
+int engage_ramp_laser1 = 0; // Flag that determines if the ramp waveform should be outputed for laser 1 (if it has a value of 1) or not (if it has a value of 0). 
+                            // Apart from this flag to be 1, for the ramp to be outputed on laser 1, the engage_relock_track_laser1 flag should be 0.
+
+
+
+
+
 
 
 
@@ -300,24 +365,34 @@ void notifyClients(String sliderValues) {
   ws.textAll(sliderValues);
 }
 
+
+
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
     message = (char*)data;
     
-    if (message.indexOf("0C") >= 0){
-      switchString = message.substring(2);
-      switchStatus = switchString.toInt();
-      Serial.println(switchStatus);  
+    if (message.indexOf("1REL") >= 0){
+      elp = message.substring(4);
+      engage_relock_track_laser1 = elp.toInt();
+      //Serial.println(switchStatus);  
       }
+
+
+    if (message.indexOf("1RAM") >= 0){
+      elp = message.substring(4);
+      engage_ramp_laser1 = elp.toInt();
+      //Serial.println(switchStatus);  
+      }
+
       
     if (message.indexOf("1s") >= 0) {
       sliderValue1 = message.substring(2);
       //threshold_engage1 = map(sliderValue1.toInt(), 0, 3300, 0, 3.3);
       threshold_engage1 = sliderValue1.toInt();
       threshold_engage1 = threshold_engage1*Volt_to_number_8/1000;
-      Serial.println(threshold_engage1);
+      //Serial.println(threshold_engage1);
       //Serial.print(getSliderValues());
       notifyClients(getSliderValues());
     }
@@ -326,28 +401,10 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       //threshold_disengage1 = map(sliderValue1.toInt(), 0, 3300, 0, 3.3);
       threshold_disengage1 = sliderValue2.toInt();
       threshold_disengage1 = threshold_disengage1*Volt_to_number_8/1000;
-      Serial.println(threshold_disengage1);
+      //Serial.println(threshold_disengage1);
       //Serial.print(getSliderValues());
       notifyClients(getSliderValues());
-    }    
-    if (message.indexOf("3s") >= 0) {
-      sliderValue3 = message.substring(2);
-      //threshold_engage2 = map(sliderValue3.toInt(), 0, 3300, 0, 3.3);
-      threshold_engage2 = sliderValue3.toInt();
-      threshold_engage2 = threshold_engage2*Volt_to_number_10/1000;
-      Serial.println(threshold_engage2);
-      //Serial.print(getSliderValues());
-      notifyClients(getSliderValues());
-    }
-    if (message.indexOf("4s") >= 0) {
-      sliderValue4 = message.substring(2);
-      //threshold_disengage2 = map(sliderValue4.toInt(), 0, 3300, 0, 3.3);
-      threshold_disengage2 = sliderValue4.toInt();
-      threshold_disengage2 = threshold_disengage2*Volt_to_number_10/1000;
-      Serial.println(threshold_disengage2);
-      //Serial.print(getSliderValues());
-      notifyClients(getSliderValues());
-    }    
+    }        
     if (strcmp((char*)data, "getValues") == 0) {
       notifyClients(getSliderValues());
     }
@@ -377,6 +434,17 @@ void initWebSocket() {
 
 
 void setup() {
+  //initialise the instance of the SPIClasses
+  vspi = new SPIClass(VSPI);
+  hspi = new SPIClass(HSPI);
+  // route through GPIO pins of your choice
+  vspi->begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI, VSPI_SS); //SCLK, MISO, MOSI, SS
+  hspi->begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, HSPI_SS); //SCLK, MISO, MOSI, SS
+  //set up slave select pins as outputs as the Arduino API
+  //doesn't handle automatically pulling SS low
+  pinMode(vspi->pinSS(), OUTPUT); //VSPI SS
+  pinMode(hspi->pinSS(), OUTPUT); //HSPI SS
+  
   Serial.begin(115200);
   // Set relay control pins 
   pinMode(relay11, OUTPUT);
@@ -384,21 +452,14 @@ void setup() {
   pinMode(relay13, OUTPUT);
   pinMode(relay14, OUTPUT);
 
-  pinMode(relay21, OUTPUT);
-  pinMode(relay22, OUTPUT);
-  pinMode(relay23, OUTPUT);
-  pinMode(relay24, OUTPUT);
-
-  //Initially all realys should be off
+  pinMode(osci_trigger_laser1, OUTPUT);
+  //Initially all realys and outputs should be in the OFF state
   digitalWrite(relay11, HIGH);
   digitalWrite(relay12, HIGH);
   digitalWrite(relay13, HIGH);
   digitalWrite(relay14, HIGH);
-  digitalWrite(relay21, HIGH);
-  digitalWrite(relay22, HIGH);
-  digitalWrite(relay23, HIGH);
-  digitalWrite(relay24, HIGH);
-  timer1_setup(500); // 10 is 2ms interval like this since function with 30 points is around 66Hz and the one with 900 points is around 2 Hz
+
+  timer1_setup(10000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
 
   delay(1000);
 
@@ -421,34 +482,28 @@ void setup() {
 
 void loop() {
 
-  // Reading potentiometer value
-  Value_laser2 = analogRead(ADC1_CH4);
-  Value_laser2 = analogRead(ADC1_CH4);
-  Value_laser2 = analogRead(ADC1_CH4);
-  Value_laser1 = analogRead(ADC1_CH2);
-  Value_laser1 = analogRead(ADC1_CH2);
-  Value_laser1 = analogRead(ADC1_CH2);
+  // Reading PD value
+  Value_laser1 = analogRead(ADC1_CH5);
+  Value_laser1 = analogRead(ADC1_CH5);
+  Value_laser1 = analogRead(ADC1_CH5);
 
-  //Serial.println(Value_laser1);
-  //Serial.println(Value_laser2);
-  //Serial.println(threshold_engage1);
-//  delay(200);
-//  Serial.println(threshold_disengage1);
-//  delay(200);
-//  Serial.println(threshold_engage1);
-//  delay(50);
-//  Serial.println(threshold_disengage2);
-//  delay(50);
 
-if (switchStatus == 1){ //Go to lock tracking only if the "Engage lock tracking" is ticked
-  
+if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage lock tracking laser 1" is ticked
+  ramp_gen_flag_laser1 = 0;  // If the ramp was being generated for laser 1, stop it now
+   
   if (Value_laser1 > threshold_engage1){
     timer_off_lock_laser1 = 0;
-    timerAlarmDisable(timer); // Stop generating re-lock waveforms
-    digitalWrite(relay11, LOW);
-    digitalWrite(relay12, LOW);
-    digitalWrite(relay13, LOW);
-    digitalWrite(relay14, LOW);
+    
+    re_lock_gen_flag_laser1 = 0; // Indicate to the timer interrupt routine to stop generating relock waveforms on laser 1
+    // Order of engaging integrators matters!
+    digitalWrite(relay12, LOW);  //laser 1, integrator piezo 2 (IP2)
+    delay(20);
+    digitalWrite(relay11, LOW);  //laser 1, integrator piezo 1 (IP1)
+    delay(20);
+    digitalWrite(relay13, LOW);  //laser 1, integrator LD 1 (IL1)
+    delay(20);
+    digitalWrite(relay14, LOW);  //laser 1, integrator LD 2 (IL2)
+    delay(20);
     }
     
    if (Value_laser1 < threshold_disengage1){
@@ -457,43 +512,23 @@ if (switchStatus == 1){ //Go to lock tracking only if the "Engage lock tracking"
     digitalWrite(relay12, HIGH);
     digitalWrite(relay13, HIGH);
     digitalWrite(relay14, HIGH);
-    timerAlarmEnable(timer); // Start generating re-lock waveforms
+    re_lock_gen_flag_laser1 = 1; // Indicate to the timer interrupt routine to start generating relock waveforms on laser 1
     }
-    Serial.println(timer_off_lock_laser1);
     timer_off_lock_laser1 = timer_off_lock_laser1 + millis();
     }
-    
-   if (Value_laser2 > threshold_engage2){
-    timer_off_lock_laser2 = 0;
-    timerAlarmDisable(timer); // Stop generating re-lock waveforms
-    digitalWrite(relay21, LOW);
-    digitalWrite(relay22, LOW);
-    digitalWrite(relay23, LOW);
-    digitalWrite(relay24, LOW);
-    }
-    
-   if (Value_laser2 < threshold_disengage2){
-    if (timer_off_lock_laser2 > 5000) { 
-    digitalWrite(relay21, HIGH);
-    digitalWrite(relay22, HIGH);
-    digitalWrite(relay23, HIGH);
-    digitalWrite(relay24, HIGH);
-    timerAlarmEnable(timer); // Start generating re-lock waveforms
-    }
-    timer_off_lock_laser2 = timer_off_lock_laser2 + millis();
-    }
 }else{
-  // If "Engage lock tracking" is unticked, disengage all the relays
+  // If "Engage lock tracking laser 1" is unticked, disengage all the relays
   digitalWrite(relay11, HIGH);
   digitalWrite(relay12, HIGH);
   digitalWrite(relay13, HIGH);
   digitalWrite(relay14, HIGH);
-  digitalWrite(relay21, HIGH);
-  digitalWrite(relay22, HIGH);
-  digitalWrite(relay23, HIGH);
-  digitalWrite(relay24, HIGH);
-  timerAlarmDisable(timer); // Stop generating re-lock waveforms
+  re_lock_gen_flag_laser1 = 0; // Indicate to the timer interrupt routine to stop generating relock waveforms on laser 1
+  if (engage_ramp_laser1 == 1){ // If the Engage ramp laser 1 is ticked, start generating the ramp on laser 1, now when the relock track laser 1 is off
+    ramp_gen_flag_laser1 = 1; 
+    }else{ // Otherwise, stop the ramp on laser 1
+     ramp_gen_flag_laser1 = 0; }
   }
+
   ws.cleanupClients();
   //delay(200);
 }

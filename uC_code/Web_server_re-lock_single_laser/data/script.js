@@ -46,25 +46,12 @@ function toggleCheckboxRelockL1(checkbox) {
   websocket.send("1REL"+message);
 }
 
-// Function to toggle the checkbox 2
-function toggleCheckboxRelockL2(checkbox) {
-  const isChecked = checkbox.checked;
-  const message = isChecked ? '1' : '0';
-  websocket.send("2REL"+message);
-}
 
 // Function to toggle the checkbox 3
 function toggleCheckboxRampL1(checkbox) {
   const isChecked = checkbox.checked;
   const message = isChecked ? '1' : '0';
   websocket.send("1RAM"+message);
-}
-
-// Function to toggle the checkbox 4
-function toggleCheckboxRampL2(checkbox) {
-  const isChecked = checkbox.checked;
-  const message = isChecked ? '1' : '0';
-  websocket.send("2RAM"+message);
 }
 
 
