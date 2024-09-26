@@ -20,14 +20,14 @@ html {
     margin: 0;
   }
   .content {
-    padding: 0px;
+    padding: 30px;
   }
   .card-grid {
     max-width: 700px;
     margin: 0 auto;
     display: grid;
     grid-gap: 2rem;
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
   .card {
     background-color: white;

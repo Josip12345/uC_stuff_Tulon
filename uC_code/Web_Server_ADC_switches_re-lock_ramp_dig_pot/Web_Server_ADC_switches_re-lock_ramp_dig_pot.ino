@@ -1,4 +1,4 @@
-/* 
+  /* 
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/esp32-web-server-websocket-sliders/
   
@@ -61,11 +61,13 @@ int ramp_gen_flag_laser2 = 0; // This flag indicates to the timer interrupt rout
 //////////For relock
 
 // Some defintions for SPI bus connecting the dig pot to the microcontroller
+// Piezo
 #define VSPI_MISO   13 //SDO
 #define VSPI_MOSI   42 //SDI
 #define VSPI_SCLK   41
 #define VSPI_SS     40
 
+// LD
 #define HSPI_MISO   18 //SDO
 #define HSPI_MOSI   17 //SDI
 #define HSPI_SCLK   16
@@ -94,10 +96,10 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 
 
-float amplitude1 = 0.25; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V
+float amplitude1 = 0.05; // Amplitude of the fast sine function, this value is calibrated for pp piezo voltage of approx 12 V
 float DC_offset1 = 56; //Some calibrated value for the offset
-float amplitude2_max = 0.2; // Amplitude of the slow sine function
-float DC_offset2 = 80; //Some calibrated value for the offset
+float amplitude2_max = 0.04; // Amplitude of the slow sine function, calibrated for 200mV pp at the LD, with the 1.5kohm shunt resistor 
+float DC_offset2 = 56; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
 const int num_amp_steps = 5; //Number of slow sine amplitude steps
@@ -563,7 +565,7 @@ void setup() {
   digitalWrite(relay23, HIGH);
   digitalWrite(relay24, HIGH);
 
-  timer1_setup(10000); // 10 is 2ms interval; like this sine with 30 points is around 10Hz and the one with 900 points is around <0.5 Hz
+  timer1_setup(10000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
 
   delay(1000);
 
