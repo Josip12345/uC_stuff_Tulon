@@ -32,6 +32,8 @@
             </div>
 
             <div class="card">
+
+            <div class="card">
                 <p class="card-title">threshold_engage laser 1</p>
                 <p class="switch">
                     <input type="range" onchange="updateSliderPWM(this)" id="slider1" min="0" max="2600" step="10" value ="0" class="slider">
@@ -46,6 +48,14 @@
                 <p class="state">Threshold: <span id="sliderValue2"></span> mV;
                 </p>
 
+            </div>
+
+            <div class="card">
+                <p class="card-title">Ramp amplitude</p>
+                <p class="switch">
+                    <input type="range" onchange="updateSliderPWM(this)" id="slider3" min="0" max="100" step="1" value ="0" class="slider">
+                </p>
+                <p class="state">Amplitude: <span id="sliderValue3"></span>%;</p>
             </div>
 
 

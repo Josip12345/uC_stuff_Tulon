@@ -99,7 +99,8 @@ float amplitude2 = amp_incr; //Starting amplitude of the slow sine is equal to a
 hw_timer_t *timer = timerBegin(1, 80, true);  // Timer 1, prescaler 80, count up
 int ramp_amp1;
 int ramp_amp2;
-int ramp_amp;
+float ramp_amp = 0.5;
+int ra; 
 
 // Sine LookUpTable & Index Variable
 int SampleIdx1_laser1 = 0; // Index for going through the fast sine function
@@ -246,18 +247,18 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
 
   
   if(ramp_gen_flag_laser1 == 1){ 
-    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.25+DC_offset2); // Going through the ramp values
+    ra = int(ramp10LookupTable[SampleIdx3_laser1++]*ramp_amp+128); // Going through the ramp values
     if(SampleIdx3_laser1 == 10){
       SampleIdx3_laser1 = 0;
       toogle_laser1 = !toogle_laser1;
       digitalWrite(osci_trigger_laser1, toogle_laser1); // Generating a sync trigger signal for the oscilloscope
     }
-    if(ramp_amp > 255){
-      ramp_amp = 255;
-    }else if (ramp_amp < 0){
-      ramp_amp = 0;
+    if(ra > 255){
+      ra = 255;
+    }else if (ra < 0){
+      ra = 0;
     }
-    spiCommand(hspi, 00, ramp_amp); // The ramps waveform goes to port A of the dig trimpot 1 (LD)
+    spiCommand(hspi, 00, ra); // The ramps waveform goes to port A of the dig trimpot 1 (LD)
  }
  
 }
@@ -292,9 +293,7 @@ int Volt_to_number_10 = 3100.0;
 int threshold_engage1 = Volt_to_number_8*1.0; // Integrators engaged above PD value of 1 V
 int threshold_disengage1 = Volt_to_number_8*0.8; // Integrators disengaged below a PD value of 0.8 V
                                                // Like this we have needed hysteresis
-
-
-                                           
+                                     
 
 String message = "";
 String sliderValue1 = "0";
@@ -404,7 +403,18 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       //Serial.println(threshold_disengage1);
       //Serial.print(getSliderValues());
       notifyClients(getSliderValues());
-    }        
+    }      
+
+    if (message.indexOf("3s") >= 0) {
+      sliderValue3 = message.substring(2);
+      //threshold_disengage1 = map(sliderValue1.toInt(), 0, 3300, 0, 3.3);
+      ramp_amp = sliderValue3.toFloat();
+      ramp_amp = ramp_amp/100;
+      //Serial.println(threshold_disengage1);
+      //Serial.print(getSliderValues());
+      notifyClients(getSliderValues());
+    }
+
     if (strcmp((char*)data, "getValues") == 0) {
       notifyClients(getSliderValues());
     }
@@ -459,7 +469,7 @@ void setup() {
   digitalWrite(relay13, LOW);
   digitalWrite(relay14, LOW);
 
-  timer1_setup(10000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
+  timer1_setup(1000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
 
   delay(1000);
 
