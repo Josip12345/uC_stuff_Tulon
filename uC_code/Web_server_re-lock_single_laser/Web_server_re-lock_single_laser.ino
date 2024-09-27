@@ -89,7 +89,7 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 float amplitude1 = 0.05; // Amplitude of the fast sine function, this gives 4Vpp with the PF PCB setting atm 
 float DC_offset1 = 56; //Some calibrated value for the offset
-float amplitude2_max = 0.04; // Amplitude of the slow sine function
+float amplitude2_max = 0.25; // Amplitude of the slow sine function
 float DC_offset2 = 56; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
