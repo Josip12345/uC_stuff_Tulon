@@ -246,7 +246,7 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
 
   
   if(ramp_gen_flag_laser1 == 1){ 
-    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.7+DC_offset2); // Going through the ramp values
+    ramp_amp = int(ramp10LookupTable[SampleIdx3_laser1++]*0.25+DC_offset2); // Going through the ramp values
     if(SampleIdx3_laser1 == 10){
       SampleIdx3_laser1 = 0;
       toogle_laser1 = !toogle_laser1;
@@ -454,10 +454,10 @@ void setup() {
 
   pinMode(osci_trigger_laser1, OUTPUT);
   //Initially all realys and outputs should be in the OFF state
-  digitalWrite(relay11, HIGH);
-  digitalWrite(relay12, HIGH);
-  digitalWrite(relay13, HIGH);
-  digitalWrite(relay14, HIGH);
+  digitalWrite(relay11, LOW);
+  digitalWrite(relay12, LOW);
+  digitalWrite(relay13, LOW);
+  digitalWrite(relay14, LOW);
 
   timer1_setup(10000); // 10 is 2ms interval; like this sine with 30 points is around 21Hz and the one with 900 points is around 0.5 Hz
 
@@ -517,11 +517,11 @@ if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage 
     timer_off_lock_laser1 = timer_off_lock_laser1 + millis();
     }
 }else{
-  // If "Engage lock tracking laser 1" is unticked, disengage all the relays
-  digitalWrite(relay11, HIGH);
-  digitalWrite(relay12, HIGH);
-  digitalWrite(relay13, HIGH);
-  digitalWrite(relay14, HIGH);
+  // If "Engage lock tracking laser 1" is unticked, open all the relays
+  digitalWrite(relay11, LOW);
+  digitalWrite(relay12, LOW);
+  digitalWrite(relay13, LOW);
+  digitalWrite(relay14, LOW);
   re_lock_gen_flag_laser1 = 0; // Indicate to the timer interrupt routine to stop generating relock waveforms on laser 1
   if (engage_ramp_laser1 == 1){ // If the Engage ramp laser 1 is ticked, start generating the ramp on laser 1, now when the relock track laser 1 is off
     ramp_gen_flag_laser1 = 1; 
