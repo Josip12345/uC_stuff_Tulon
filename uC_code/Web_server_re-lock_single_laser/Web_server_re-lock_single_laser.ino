@@ -16,8 +16,9 @@
 #include "SPIFFS.h"
 #include <Arduino_JSON.h>
 
+
 // Replace with your network credentials
-const char* ssid = "LockTrack";
+const char* ssid = "LockTrack2";
 const char* password = "";
 
 // Create AsyncWebServer object on port 80
@@ -87,7 +88,7 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 
 
-float amplitude1 = 0.05; // Amplitude of the fast sine function, this gives 4Vpp with the PF PCB setting atm 
+float amplitude1 = 0.5; // Amplitude of the fast sine function, this gives a large amplitude to cover piezo range
 float DC_offset1 = 56; //Some calibrated value for the offset
 float amplitude2_max = 0.25; // Amplitude of the slow sine function
 float DC_offset2 = 56; //Some calibrated value for the offset
@@ -212,7 +213,6 @@ void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
 ////////////
   if (re_lock_gen_flag_laser1 == 1){ // If re_lock_gen_flag_laser1 == 1 means that the relock waveforms should be outputed
 // Send SineTable Values To DAC One By One
-  
   ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser1++]*amplitude1+DC_offset1); // Going thorught the fast sine values
   ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2); // Going thorught the slow sine values
   // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
@@ -489,6 +489,7 @@ void setup() {
   server.begin();
 
 }
+ 
 
 void loop() {
 
@@ -500,7 +501,9 @@ void loop() {
 
 if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage lock tracking laser 1" is ticked
   ramp_gen_flag_laser1 = 0;  // If the ramp was being generated for laser 1, stop it now
-   
+
+
+  
   if (Value_laser1 > threshold_engage1){
     timer_off_lock_laser1 = 0;
     
@@ -517,7 +520,7 @@ if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage 
     }
     
    if (Value_laser1 < threshold_disengage1){
-    if (timer_off_lock_laser1 > 5000) { 
+    if (timer_off_lock_laser1 > 5000) {  //Here we wait for some time between laser transmission amplitude goes below the lock threshold and disengaging the lock/starting re-lock waveform 
     digitalWrite(relay11, HIGH);
     digitalWrite(relay12, HIGH);
     digitalWrite(relay13, HIGH);
