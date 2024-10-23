@@ -45,8 +45,6 @@ int Value_laser1 = 0;
 unsigned long timer_off_lock_laser1 = 0;
 
 
-int re_lock_gen_flag_laser1 = 0; // This flag indicates to the timer interrupt routine that relock waveforms should be outputed for laser 1; (if it has a value of 1) or not (if it has the value of 0)
-int ramp_gen_flag_laser1 = 0; // This flag indicates to the timer interrupt routine that it should generate the ramp waveform for the laser 1; (if it has a value of 1) or not (if it has the value of 0)
 
 
 
@@ -88,7 +86,7 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 
 
-float amplitude1 = 0.5; // Amplitude of the fast sine function, this gives a large amplitude to cover piezo range
+float amplitude1 = 0.25; // Amplitude of the fast sine function, this gives a large amplitude to cover piezo range
 float DC_offset1 = 56; //Some calibrated value for the offset
 float amplitude2_max = 0.25; // Amplitude of the slow sine function
 float DC_offset2 = 56; //Some calibrated value for the offset
@@ -98,8 +96,8 @@ const int num_amp_steps = 5; //Number of slow sine amplitude steps
 float amp_incr = amplitude2_max/num_amp_steps;
 float amplitude2 = amp_incr; //Starting amplitude of the slow sine is equal to amp_incr
 hw_timer_t *timer = timerBegin(1, 80, true);  // Timer 1, prescaler 80, count up
-int ramp_amp1;
-int ramp_amp2;
+int LD_relock_amp;
+int Piezo_relock_amp;
 float ramp_amp = 0.5;
 int ra; 
 
@@ -207,60 +205,15 @@ const int sine900LookupTable[] = { 1,    1,    2,    3,    4,    5,    6,    7, 
         -16,  -16,  -15,  -14,  -13,  -12,  -11,  -10,   -9,   -8,   -8,
          -7,   -6,   -5,   -4,   -3,   -2,   -1,    0,    0};
 
-void IRAM_ATTR timer1_ISR() { // Timer interrupt routine
-  
-///// LASER 1
-////////////
-  if (re_lock_gen_flag_laser1 == 1){ // If re_lock_gen_flag_laser1 == 1 means that the relock waveforms should be outputed
-// Send SineTable Values To DAC One By One
-  ramp_amp1 = int(sine30LookupTable[SampleIdx1_laser1++]*amplitude1+DC_offset1); // Going thorught the fast sine values
-  ramp_amp2 = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2); // Going thorught the slow sine values
-  // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
-  
-  if(ramp_amp1 > 255){
-    ramp_amp1 = 255;
-  }else if (ramp_amp1 < 0){
-    ramp_amp1 = 0;
-  }
-  if(SampleIdx1_laser1 == 30){
-    SampleIdx1_laser1 = 0;
-  }
-  
-  if(ramp_amp2 > 255){
-    ramp_amp2 = 255;
-  }else if (ramp_amp2 < 0){
-    ramp_amp2 = 0;
-  }
-  
-  if(SampleIdx2_laser1 == 900){
-    SampleIdx2_laser1 = 0;
-    amplitude2 = amplitude2 + amp_incr;
-    amp_incr_cnt++;
-    if (amp_incr_cnt == num_amp_steps){
-      amplitude2 = amp_incr;
-      amp_incr_cnt = 0;
-      }
-  }
-  spiCommand(hspi, 00, ramp_amp2); // The slow (LD) relock waveform goes to port A of the dig trimpot 1
-  spiCommand(vspi, 00, ramp_amp1); // The fast (piezo) relock waveform goes to port A of the dig trimpot 2
-  }
 
-  
-  if(ramp_gen_flag_laser1 == 1){ 
-    ra = int(ramp10LookupTable[SampleIdx3_laser1++]*ramp_amp+128); // Going through the ramp values
-    if(SampleIdx3_laser1 == 10){
-      SampleIdx3_laser1 = 0;
-      toogle_laser1 = !toogle_laser1;
-      digitalWrite(osci_trigger_laser1, toogle_laser1); // Generating a sync trigger signal for the oscilloscope
-    }
-    if(ra > 255){
-      ra = 255;
-    }else if (ra < 0){
-      ra = 0;
-    }
-    spiCommand(hspi, 00, ra); // The ramps waveform goes to port A of the dig trimpot 1 (LD)
- }
- 
+
+       
+bool next_sample = 0; // Timer conter variable
+
+void IRAM_ATTR timer1_ISR() { 
+  // Timer interrupt routine
+  // It is used only for giving a flag, which indicates to go to he next sample in the waveform generation, to keep it short
+  next_sample = 1;
 }
 
 void timer1_setup(uint32_t interval) {
@@ -276,7 +229,75 @@ void timer1_setup(uint32_t interval) {
   timerAlarmEnable(timer);
 }
 
+  
 
+
+// WAVEFORM GENERATION ROUTINES
+
+void gen_relock_wave(){
+  // This routine geenrates re-lock waveforms for LD (slow) and piezo (fast)
+  // It goes through values in the respective lookup tables and sends
+  // those values to the respective trimpots via SPI bus
+  if (next_sample == 0){
+    return;
+  }
+  next_sample = 0; // Erase the timer flag
+ 
+  LD_relock_amp = int(sine30LookupTable[SampleIdx1_laser1++]*amplitude1+DC_offset1); // Going thorught the fast sine values
+  Piezo_relock_amp = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2); // Going thorught the slow sine values
+  // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
+  
+  if(LD_relock_amp > 255){
+    LD_relock_amp = 255;
+  }else if (LD_relock_amp < 0){
+    LD_relock_amp = 0;
+  }
+  if(SampleIdx1_laser1 == 30){
+    SampleIdx1_laser1 = 0;
+  }
+  
+  if(Piezo_relock_amp > 255){
+    Piezo_relock_amp = 255;
+  }else if (Piezo_relock_amp < 0){
+    Piezo_relock_amp = 0;
+  }
+  
+  if(SampleIdx2_laser1 == 900){
+    SampleIdx2_laser1 = 0;
+    amplitude2 = amplitude2 + amp_incr;
+    amp_incr_cnt++;
+    if (amp_incr_cnt == num_amp_steps){
+      amplitude2 = amp_incr;
+      amp_incr_cnt = 0;
+      }
+  }
+  spiCommand(hspi, 00, Piezo_relock_amp); // The slow (LD) relock waveform goes to port A of the dig trimpot 1
+  spiCommand(vspi, 00, LD_relock_amp); // The fast (piezo) relock waveform goes to port A of the dig trimpot 2
+  }
+
+
+void gen_ramp(){ 
+  // This routine generates the ramp waveform for the LD
+  // It goes through values in the respective lookup table 
+  // those values to the respective trimpot via SPI bus
+  if (next_sample == 0){
+    return;
+  }
+  next_sample = 0; // Erase the timer flag
+  
+  ra = int(ramp10LookupTable[SampleIdx3_laser1++]*ramp_amp+128); // Going through the ramp values
+  if(SampleIdx3_laser1 == 10){
+    SampleIdx3_laser1 = 0;
+    toogle_laser1 = !toogle_laser1;
+    digitalWrite(osci_trigger_laser1, toogle_laser1); // Generating a sync trigger signal for the oscilloscope
+  }
+  if(ra > 255){
+    ra = 255;
+  }else if (ra < 0){
+    ra = 0;
+  }
+  spiCommand(hspi, 00, ra); // The ramps waveform goes to port A of the dig trimpot 1 (LD) 
+}
 
 
 
@@ -487,9 +508,14 @@ void setup() {
 
   // Start server
   server.begin();
-
 }
+
+
+
+
+
  
+int delta_millis = 0; 
 
 void loop() {
 
@@ -500,14 +526,13 @@ void loop() {
 
 
 if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage lock tracking laser 1" is ticked
-  ramp_gen_flag_laser1 = 0;  // If the ramp was being generated for laser 1, stop it now
 
 
-  
+
   if (Value_laser1 > threshold_engage1){
     timer_off_lock_laser1 = 0;
-    
-    re_lock_gen_flag_laser1 = 0; // Indicate to the timer interrupt routine to stop generating relock waveforms on laser 1
+    delta_millis = millis(); //Get the exact time when the lock condition started to be not satisfied
+   
     // Order of engaging integrators matters!
     digitalWrite(relay12, LOW);  //laser 1, integrator piezo 2 (IP2)
     delay(20);
@@ -525,23 +550,23 @@ if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage 
     digitalWrite(relay12, HIGH);
     digitalWrite(relay13, HIGH);
     digitalWrite(relay14, HIGH);
-    re_lock_gen_flag_laser1 = 1; // Indicate to the timer interrupt routine to start generating relock waveforms on laser 1
+    gen_relock_wave(); // Start generating relock waveforms
     }
-    timer_off_lock_laser1 = timer_off_lock_laser1 + millis();
+    timer_off_lock_laser1 = timer_off_lock_laser1 + millis() - delta_millis; // Subsctract the exact time when the lock condition started to be not satisfied
+                                                                             // to get the time from when that happened
     }
 }else{
-  // If "Engage lock tracking laser 1" is unticked, open all the relays
+  // If "Engage lock tracking" is unticked, disengage the integrators
   digitalWrite(relay11, LOW);
   digitalWrite(relay12, LOW);
   digitalWrite(relay13, LOW);
   digitalWrite(relay14, LOW);
-  re_lock_gen_flag_laser1 = 0; // Indicate to the timer interrupt routine to stop generating relock waveforms on laser 1
-  if (engage_ramp_laser1 == 1){ // If the Engage ramp laser 1 is ticked, start generating the ramp on laser 1, now when the relock track laser 1 is off
-    ramp_gen_flag_laser1 = 1; 
-    }else{ // Otherwise, stop the ramp on laser 1
-     ramp_gen_flag_laser1 = 0; }
+  
+  if (engage_ramp_laser1 == 1){ // If the Engage ramp laser 1 is ticked, start generating the ramp on laser 1, now when the relock track is off
+  gen_ramp();
   }
 
   ws.cleanupClients();
   //delay(200);
+}
 }
