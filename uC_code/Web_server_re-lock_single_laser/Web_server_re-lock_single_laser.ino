@@ -87,7 +87,7 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 
 float amplitude1 = 0.25; // Amplitude of the fast sine function, this gives a large amplitude to cover piezo range
-float DC_offset1 = 56; //Some calibrated value for the offset
+float DC_offset1 = 0; //Some calibrated value for the offset
 float amplitude2_max = 0.25; // Amplitude of the slow sine function
 float DC_offset2 = 56; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
@@ -96,10 +96,11 @@ const int num_amp_steps = 5; //Number of slow sine amplitude steps
 float amp_incr = amplitude2_max/num_amp_steps;
 float amplitude2 = amp_incr; //Starting amplitude of the slow sine is equal to amp_incr
 hw_timer_t *timer = timerBegin(1, 80, true);  // Timer 1, prescaler 80, count up
-int LD_relock_amp;
 int Piezo_relock_amp;
+int LD_relock_amp;
 float ramp_amp = 0.5;
-int ra; 
+int ra;
+int rv=0; //Buffer ver for the piezo dig pot value 
 
 // Sine LookUpTable & Index Variable
 int SampleIdx1_laser1 = 0; // Index for going through the fast sine function
@@ -243,23 +244,23 @@ void gen_relock_wave(){
   }
   next_sample = 0; // Erase the timer flag
  
-  LD_relock_amp = int(sine30LookupTable[SampleIdx1_laser1++]*amplitude1+DC_offset1); // Going thorught the fast sine values
-  Piezo_relock_amp = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2); // Going thorught the slow sine values
+  Piezo_relock_amp = int((sine30LookupTable[SampleIdx1_laser1++]+DC_offset1)*amplitude1+rv); // Going thorught the fast sine values, value from -128 to 128 are transposed to 0 to 
+  LD_relock_amp = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2); // Going thorught the slow sine values
   // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
-  
-  if(LD_relock_amp > 255){
-    LD_relock_amp = 255;
-  }else if (LD_relock_amp < 0){
-    LD_relock_amp = 0;
-  }
-  if(SampleIdx1_laser1 == 30){
-    SampleIdx1_laser1 = 0;
-  }
   
   if(Piezo_relock_amp > 255){
     Piezo_relock_amp = 255;
   }else if (Piezo_relock_amp < 0){
     Piezo_relock_amp = 0;
+  }
+  if(SampleIdx1_laser1 == 30){
+    SampleIdx1_laser1 = 0;
+  }
+  
+  if(LD_relock_amp > 255){
+    LD_relock_amp = 255;
+  }else if (LD_relock_amp < 0){
+    LD_relock_amp = 0;
   }
   
   if(SampleIdx2_laser1 == 900){
@@ -271,8 +272,8 @@ void gen_relock_wave(){
       amp_incr_cnt = 0;
       }
   }
-  spiCommand(hspi, 00, Piezo_relock_amp); // The slow (LD) relock waveform goes to port A of the dig trimpot 1
-  spiCommand(vspi, 00, LD_relock_amp); // The fast (piezo) relock waveform goes to port A of the dig trimpot 2
+  spiCommand(hspi, 00, LD_relock_amp); // The slow (LD) relock waveform goes to port A of the dig trimpot 1
+  spiCommand(vspi, 00, Piezo_relock_amp); // The fast (piezo) relock waveform goes to port A of the dig trimpot 2
   }
 
 
@@ -433,6 +434,13 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       ramp_amp = ramp_amp/100;
       //Serial.println(threshold_disengage1);
       //Serial.print(getSliderValues());
+      notifyClients(getSliderValues());
+    }
+
+    if (message.indexOf("4s") >= 0) {
+      sliderValue4 = message.substring(2);
+      rv = sliderValue4.toInt();
+      spiCommand(vspi, 00, rv); // Setting the offset piezo value set by the user via slider 4
       notifyClients(getSliderValues());
     }
 
