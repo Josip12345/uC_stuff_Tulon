@@ -100,7 +100,9 @@ int Piezo_relock_amp;
 int LD_relock_amp;
 float ramp_amp = 0.5;
 int ra;
-int rv=0; //Buffer ver for the piezo dig pot value 
+int rv=0; //Buffer variable for the piezo dig pot offset
+int rv_LD=0; //Buffer variable for the LD dig pot offset
+
 
 // Sine LookUpTable & Index Variable
 int SampleIdx1_laser1 = 0; // Index for going through the fast sine function
@@ -245,7 +247,7 @@ void gen_relock_wave(){
   next_sample = 0; // Erase the timer flag
  
   Piezo_relock_amp = int((sine30LookupTable[SampleIdx1_laser1++]+DC_offset1)*amplitude1+rv); // Going thorught the fast sine values, value from -128 to 128 are transposed to 0 to 
-  LD_relock_amp = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2); // Going thorught the slow sine values
+  LD_relock_amp = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2+rv); // Going thorught the slow sine values
   // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
   
   if(Piezo_relock_amp > 255){
@@ -322,6 +324,7 @@ String sliderValue1 = "0";
 String sliderValue2 = "0";
 String sliderValue3 = "0";
 String sliderValue4 = "0";
+String sliderValue5 = "0";
 String elp = "0";
 
 int engage_relock_track_laser1 = 0; // This flag determines if the laser 1 lock status should be tracked. Does not imply outputing relock waveforms.
@@ -345,7 +348,8 @@ String getSliderValues(){
   sliderValues["sliderValue2"] = String(sliderValue2);
   sliderValues["sliderValue3"] = String(sliderValue3);
   sliderValues["sliderValue4"] = String(sliderValue4);
-
+  sliderValues["sliderValue5"] = String(sliderValue5);
+  
   String jsonString = JSON.stringify(sliderValues);
   return jsonString;
 }
@@ -440,9 +444,17 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     if (message.indexOf("4s") >= 0) {
       sliderValue4 = message.substring(2);
       rv = sliderValue4.toInt();
-      spiCommand(vspi, 00, rv); // Setting the offset piezo value set by the user via slider 4
+      spiCommand(vspi, 00, rv); // Setting the offset piezo value entered by the user via slider 4
       notifyClients(getSliderValues());
     }
+
+    if (message.indexOf("5s") >= 0) {
+      sliderValue5 = message.substring(2);
+      rv_LD = sliderValue5.toInt();
+      spiCommand(hspi, 00, rv_LD); // Setting the offset LD value entered by the user via slider 5
+      notifyClients(getSliderValues());
+    }
+
 
     if (strcmp((char*)data, "getValues") == 0) {
       notifyClients(getSliderValues());
