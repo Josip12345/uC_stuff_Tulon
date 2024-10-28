@@ -89,7 +89,7 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 float amplitude1 = 0.25; // Amplitude of the fast sine function, this gives a large amplitude to cover piezo range
 float DC_offset1 = 0; //Some calibrated value for the offset
 float amplitude2_max = 0.25; // Amplitude of the slow sine function
-float DC_offset2 = 56; //Some calibrated value for the offset
+float DC_offset2 = 0; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
 const int num_amp_steps = 5; //Number of slow sine amplitude steps
@@ -247,7 +247,7 @@ void gen_relock_wave(){
   next_sample = 0; // Erase the timer flag
  
   Piezo_relock_amp = int((sine30LookupTable[SampleIdx1_laser1++]+DC_offset1)*amplitude1+rv); // Going thorught the fast sine values, value from -128 to 128 are transposed to 0 to 
-  LD_relock_amp = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2+rv); // Going thorught the slow sine values
+  LD_relock_amp = int(sine900LookupTable[SampleIdx2_laser1++]*amplitude2+DC_offset2+rv_LD); // Going thorught the slow sine values
   // The frequency ratio of fast to slow sine functions is defined by the ratio of their number of points
   
   if(Piezo_relock_amp > 255){
@@ -451,6 +451,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     if (message.indexOf("5s") >= 0) {
       sliderValue5 = message.substring(2);
       rv_LD = sliderValue5.toInt();
+      rv_LD = map(rv_LD, 0, 128, 18, 128); // Accounting for the non-linearity caused by the parallel resistance of the offset diff amp input resistors
       spiCommand(hspi, 00, rv_LD); // Setting the offset LD value entered by the user via slider 5
       notifyClients(getSliderValues());
     }
