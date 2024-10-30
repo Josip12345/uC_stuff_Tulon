@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="topnav">
-        <h1>Laser 1 control panel</h1>
+        <h1>Laser 2 control panel</h1>
     </div>
     <div class="content">
         <div class="card-grid">
@@ -62,7 +62,7 @@
             <div class="card">
                 <p class="card-title">Piezo offset</p>
                 <p class="switch">
-                    <input type="range" onchange="updateSliderPWM(this)" id="slider4" min="0" max="128" step="1" value ="0" class="slider">
+                    <input type="range" onchange="updateSliderPWM(this)" id="slider4" min="0" max="128" step="1" value ="64" class="slider">
                 </p>
                 <p class="state">Offset: <span id="sliderValue4"></span></p>
             </div>
@@ -70,9 +70,13 @@
             <div class="card">
                 <p class="card-title">LD offset</p>
                 <p class="switch">
-                    <input type="range" onchange="updateSliderPWM(this)" id="slider5" min="0" max="128" step="1" value ="0" class="slider">
+                    <input type="range" onchange="updateSliderPWM(this)" id="slider5" min="0" max="128" step="1" value ="64" class="slider">
                 </p>
                 <p class="state">Offset: <span id="sliderValue5"></span></p>
+            </div>
+            <div class="card">
+                <p class="card-title">Lock fail counter</p>
+                <div id="lock_fail_counter">0</div> <!-- Display counter value -->
             </div>
 
 

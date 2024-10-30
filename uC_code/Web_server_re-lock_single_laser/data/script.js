@@ -64,5 +64,10 @@ function onMessage(event) {
         var key = keys[i];
         document.getElementById(key).innerHTML = myObj[key];
         document.getElementById("slider"+ (i+1).toString()).value = myObj[key];
+        // Check if the key is 'counter' and set the counter
+    if (key == 'lock_fail_counter') {
+        document.getElementById('lock_fail_counter').innerText = myObj[key]; // Update the counter display
     }
+    }
+
 }

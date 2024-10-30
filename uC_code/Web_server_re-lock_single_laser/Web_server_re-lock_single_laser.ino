@@ -18,7 +18,7 @@
 
 
 // Replace with your network credentials
-const char* ssid = "LockTrack1";
+const char* ssid = "LockTrack2";
 const char* password = "";
 
 // Create AsyncWebServer object on port 80
@@ -323,8 +323,9 @@ String message = "";
 String sliderValue1 = "0";
 String sliderValue2 = "0";
 String sliderValue3 = "0";
-String sliderValue4 = "0";
-String sliderValue5 = "0";
+String sliderValue4 = "64";
+String sliderValue5 = "64";
+int lock_fail_counter = 0;
 String elp = "0";
 
 int engage_relock_track_laser1 = 0; // This flag determines if the laser 1 lock status should be tracked. Does not imply outputing relock waveforms.
@@ -349,6 +350,7 @@ String getSliderValues(){
   sliderValues["sliderValue3"] = String(sliderValue3);
   sliderValues["sliderValue4"] = String(sliderValue4);
   sliderValues["sliderValue5"] = String(sliderValue5);
+  sliderValues["lock_fail_counter"] = String(lock_fail_counter);
   
   String jsonString = JSON.stringify(sliderValues);
   return jsonString;
@@ -533,7 +535,7 @@ void setup() {
 
 
 
-
+bool lock_fail_counter_flag = 1; //This flag indicates wheather to increase the re-lock couner or not
 
  
 int delta_millis = 0; 
@@ -552,7 +554,7 @@ if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage 
 
   if (Value_laser1 > threshold_engage1){
     timer_off_lock_laser1 = 0;
-    delta_millis = millis(); //Get the exact time when the lock condition started to be not satisfied
+    delta_millis = millis(); //Get the exact time when the lock condition started to be satisfied
    
     // Order of engaging integrators matters!
     digitalWrite(relay12, LOW);  //laser 1, integrator piezo 2 (IP2)
@@ -563,6 +565,8 @@ if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage 
     delay(20);
     digitalWrite(relay14, LOW);  //laser 1, integrator LD 2 (IL2)
     delay(20);
+    lock_fail_counter_flag = 0;
+    
     }
     
    if (Value_laser1 < threshold_disengage1){
@@ -571,9 +575,15 @@ if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage 
     digitalWrite(relay12, HIGH);
     digitalWrite(relay13, HIGH);
     digitalWrite(relay14, HIGH);
-    gen_relock_wave(); // Start generating relock waveforms
+    if (lock_fail_counter_flag == 0){ // Just at the first passage of this loop increase the re-lock counter
+                                    // otherwise re-lock_counter would continue to increase all the time while the laser is not locked
+      lock_fail_counter++;
+      notifyClients(getSliderValues());
+      lock_fail_counter_flag = 1;
+      }
+    gen_relock_wave(); // Generating the next sample of the relock waveforms
     }
-    timer_off_lock_laser1 = timer_off_lock_laser1 + millis() - delta_millis; // Subsctract the exact time when the lock condition started to be not satisfied
+    timer_off_lock_laser1 = timer_off_lock_laser1 + millis() - delta_millis; // Subsctract the exact time when the lock condition started to be satisfied
                                                                              // to get the time from when that happened
     }
 }else{
