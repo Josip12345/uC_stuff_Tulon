@@ -18,7 +18,7 @@
 
 
 // Replace with your network credentials
-const char* ssid = "LockTrack2";
+const char* ssid = "LockTrack1";
 const char* password = "";
 
 // Create AsyncWebServer object on port 80
@@ -88,11 +88,11 @@ void spiCommand(SPIClass *spi, byte data1, byte data2) {
 
 float amplitude1 = 0.25; // Amplitude of the fast sine function, this gives a large amplitude to cover piezo range
 float DC_offset1 = 0; //Some calibrated value for the offset
-float amplitude2_max = 0.25; // Amplitude of the slow sine function
+float amplitude2_max = 0.05; // Amplitude of the slow sine function
 float DC_offset2 = 0; //Some calibrated value for the offset
 int amp_incr_cnt = 0; // This is the counter for increasing the slow sine amplitude (one modulating the LD current) in integer steps until the 
 //lock condition is found
-const int num_amp_steps = 5; //Number of slow sine amplitude steps
+const int num_amp_steps = 10; //Number of slow sine amplitude steps
 float amp_incr = amplitude2_max/num_amp_steps;
 float amplitude2 = amp_incr; //Starting amplitude of the slow sine is equal to amp_incr
 hw_timer_t *timer = timerBegin(1, 80, true);  // Timer 1, prescaler 80, count up

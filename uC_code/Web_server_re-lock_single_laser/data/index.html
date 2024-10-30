@@ -3,20 +3,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>ESP IOT DASHBOARD</title>
+    <title>Laser control</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 <body>
     <div class="topnav">
-        <h1>Multiple Sliders</h1>
+        <h1>Laser 1 control panel</h1>
     </div>
     <div class="content">
         <div class="card-grid">
 
             <div class="card">
-                <p class="card-title">Engage lock tracking laser 1</p>
+                <p class="card-title">Engage lock tracking</p>
                 <p class="switch">
                   <input type="checkbox" onchange="toggleCheckboxRelockL1(this)">
                   <span class="slider"></span>
@@ -24,7 +24,7 @@
             </div>
 
             <div class="card">
-                <p class="card-title">Engage ramp laser 1</p>
+                <p class="card-title">Engage ramp</p>
                 <p class="switch">
                   <input type="checkbox" onchange="toggleCheckboxRampL1(this)">
                   <span class="slider"></span>
@@ -34,14 +34,14 @@
             <div class="card">
 
             <div class="card">
-                <p class="card-title">threshold_engage laser 1</p>
+                <p class="card-title">threshold_engage</p>
                 <p class="switch">
                     <input type="range" onchange="updateSliderPWM(this)" id="slider1" min="0" max="2600" step="10" value ="0" class="slider">
                 </p>
                 <p class="state">Threshold: <span id="sliderValue1"></span> mV;</p>
             </div>
             <div class="card">
-                <p class="card-title">threshold_disengage laser 1</p>
+                <p class="card-title">threshold_disengage</p>
                 <p class="switch">
                     <input type="range" onchange="updateSliderPWM(this)" id="slider2" min="0" max="2600" step="10" value ="0" class="slider">
                 </p>
