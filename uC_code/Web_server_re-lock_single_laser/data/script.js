@@ -54,6 +54,14 @@ function toggleCheckboxRampL1(checkbox) {
   websocket.send("1RAM"+message);
 }
 
+let buttonState = false; // Initial state of the button
+
+//Function to toogle the state of the pushbutton for FSR jumping and send it to the websocket
+function FSRP() {
+
+    websocket.send("FSRP"+'1');
+}
+
 
 function onMessage(event) {
     console.log(event.data);
