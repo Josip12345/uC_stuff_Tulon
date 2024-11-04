@@ -18,7 +18,7 @@
 
 
 // Replace with your network credentials
-const char* ssid = "LockTrack2";
+const char* ssid = "LockTrack1";
 const char* password = "";
 
 // Create AsyncWebServer object on port 80
@@ -279,6 +279,35 @@ void gen_relock_wave(){
   }
 
 
+void gen_next_FSR_wave(){
+  
+  // This routine generates piezo (fast) and LD (slow) waveforms for searching next 00 mode (going to the next FSR)
+  // Goes through a full period (2pi) of path lenght piezo phase by going through values in the respective lookup table and sends
+  // those values to the respective trimpot via SPI bus
+  // It does that with the maximium loop execution speed (no timer involved)
+  // Once it goes through a full piezo waveform period, it increases the value of the LD dig pot for the minimum amount, adding to the present LD offset value
+  
+  SampleIdx1_laser1 = SampleIdx1_laser1 + 3; // Outputing every thrid sample in from the sine30LookupTable
+  Piezo_relock_amp = int((sine30LookupTable[SampleIdx1_laser1++]+DC_offset1)*amplitude1+rv); // Going through fast sine values, values from -128 to 128 are transposed to 0 to 255
+  
+  if(Piezo_relock_amp > 255){
+    Piezo_relock_amp = 255;
+  }else if (Piezo_relock_amp < 0){
+    Piezo_relock_amp = 0;
+  }
+  if(SampleIdx1_laser1 == 30){
+    SampleIdx1_laser1 = 0;
+    
+    // After completing a whole piezo waveform period
+    // setting the next LD dig pot value, towards the next 00 mode
+    rv_LD = rv_LD + 1; // Using the same variable as for the offset entered by the user, such that it is easier to update the respective offset web server slider afterwards
+    spiCommand(hspi, 00, rv_LD); 
+  }
+  
+  spiCommand(vspi, 00, Piezo_relock_amp); // The fast (piezo) relock waveform goes to port A of the dig trimpot 2
+  }
+
+
 void gen_ramp(){ 
   // This routine generates the ramp waveform for the LD
   // It goes through values in the respective lookup table 
@@ -333,8 +362,8 @@ int engage_relock_track_laser1 = 0; // This flag determines if the laser 1 lock 
 int engage_ramp_laser1 = 0; // Flag that determines if the ramp waveform should be outputed for laser 1 (if it has a value of 1) or not (if it has a value of 0). 
                             // Apart from this flag to be 1, for the ramp to be outputed on laser 1, the engage_relock_track_laser1 flag should be 0.
 
-
-
+bool jump_FSRP = 0; // Flag that determines weather to jump one FSR in the LD current (frequency) increasing direction
+ 
 
 
 
@@ -412,6 +441,12 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       engage_ramp_laser1 = elp.toInt();
       //Serial.println(switchStatus);  
       }
+
+     if (message.indexOf("FSRP") >= 0){
+      jump_FSRP = true; //If FSRP button is clicked, then set FSRP flag to true. This indicates to the loop to go to the FSR jump positive routine
+      //Serial.println(switchStatus);  
+      }
+      
 
       
     if (message.indexOf("1s") >= 0) {
@@ -548,7 +583,24 @@ void loop() {
   Value_laser1 = analogRead(ADC1_CH5);
 
 
-if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage lock tracking laser 1" is ticked
+if (jump_FSRP){
+  SampleIdx2_laser1 = 0; // Resetting LD relock waveform to start from 0, next time re-lock is activated
+                         // otherwise it could cause a too large jump of the LD current
+  gen_next_FSR_wave();   // Generating next sample of the next 00 mode finding waveform
+
+  if (Value_laser1 > threshold_engage1){ // If the next 00 mode is found
+    jump_FSRP = false; // Set this flag to false to stop searching for the next 00 mode
+
+    // Update the LD offset slider in the web server
+    sliderValue5 = rv_LD;
+    notifyClients(getSliderValues());
+    }
+  
+  
+  
+  }else if (engage_relock_track_laser1 == 1){ //Go to lock tracking only if the "Engage lock tracking laser 1" is ticked
+    
+    
 
 
 
