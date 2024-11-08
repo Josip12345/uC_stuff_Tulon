@@ -241,7 +241,10 @@ void gen_relock_wave(){
   // This routine geenrates re-lock waveforms for LD (slow) and piezo (fast)
   // It goes through values in the respective lookup tables and sends
   // those values to the respective trimpots via SPI bus
+  
   if (next_sample == 0){
+    // Here we synchronize the waveform output with the ESP32 timer. It is neccessary to slow down the waveform frequency and this is an efficient way of doing that
+    // without using CPU time spending delays, while also having nicely defined clock.
     return;
   }
   next_sample = 0; // Erase the timer flag
@@ -288,6 +291,8 @@ void gen_next_FSR_wave(){
   // Once it goes through a full piezo waveform period, it increases the value of the LD dig pot for the minimum amount, adding to the present LD offset value
 
   if (next_sample == 0){
+    // Here we synchronize the waveform output with the ESP32 timer. It is neccessary to slow down the waveform frequency and this is an efficient way of doing that
+    // without using CPU time spending delays, while also having nicely defined clock.
     return;
   }
   next_sample = 0; // Erase the timer flag
@@ -305,7 +310,9 @@ void gen_next_FSR_wave(){
     
     // After completing a whole piezo waveform period
     // setting the next LD dig pot value, towards the next 00 mode
-    rv_LD = rv_LD + 1; // Using the same variable as for the offset entered by the user, such that it is easier to update the respective offset web server slider afterwards
+    if(rv_LD<255){ // Like this we ensure that the current offset value does not revolve back to minimum due to the register overflow in the dig pot/SPI
+      rv_LD = rv_LD + 1; // Using the same variable as for the offset entered by the user, such that it is easier to update the respective offset web server slider afterwards
+    }
     spiCommand(hspi, 00, rv_LD); 
   }
   
@@ -318,6 +325,8 @@ void gen_ramp(){
   // It goes through values in the respective lookup table 
   // those values to the respective trimpot via SPI bus
   if (next_sample == 0){
+    // Here we synchronize the waveform output with the ESP32 timer. It is neccessary to slow down the waveform frequency and this is an efficient way of doing that
+    // without using CPU time spending delays, while also having nicely defined clock.
     return;
   }
   next_sample = 0; // Erase the timer flag
