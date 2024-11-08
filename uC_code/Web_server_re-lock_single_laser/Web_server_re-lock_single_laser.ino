@@ -18,7 +18,7 @@
 
 
 // Replace with your network credentials
-const char* ssid = "LockTrack1";
+const char* ssid = "LockTrack2";
 const char* password = "";
 
 // Create AsyncWebServer object on port 80
@@ -286,16 +286,21 @@ void gen_next_FSR_wave(){
   // those values to the respective trimpot via SPI bus
   // It does that with the maximium loop execution speed (no timer involved)
   // Once it goes through a full piezo waveform period, it increases the value of the LD dig pot for the minimum amount, adding to the present LD offset value
+
+  if (next_sample == 0){
+    return;
+  }
+  next_sample = 0; // Erase the timer flag
   
-  SampleIdx1_laser1 = SampleIdx1_laser1 + 3; // Outputing every thrid sample in from the sine30LookupTable
-  Piezo_relock_amp = int((sine30LookupTable[SampleIdx1_laser1++]+DC_offset1)*amplitude1+rv); // Going through fast sine values, values from -128 to 128 are transposed to 0 to 255
+  SampleIdx1_laser1 = SampleIdx1_laser1 + 1; // Outputing every thrid sample in from the sine30LookupTable
+  Piezo_relock_amp = int((sine30LookupTable[SampleIdx1_laser1]+DC_offset1)*amplitude1+rv); // Going through fast sine values, values from -128 to 128 are transposed to 0 to 255
   
   if(Piezo_relock_amp > 255){
     Piezo_relock_amp = 255;
   }else if (Piezo_relock_amp < 0){
     Piezo_relock_amp = 0;
   }
-  if(SampleIdx1_laser1 == 30){
+  if(SampleIdx1_laser1 == (sizeof(sine30LookupTable)/4)){
     SampleIdx1_laser1 = 0;
     
     // After completing a whole piezo waveform period
