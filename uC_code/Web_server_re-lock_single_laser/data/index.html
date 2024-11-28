@@ -24,6 +24,22 @@
             </div>
 
             <div class="card">
+                <p class="card-title">Jump FSR +1</p>
+                <p class="switch">
+                  <input type="checkbox" id="FSRP" onchange="toggleCheckboxFSRP(this)">
+                  <span class="slider"></span>
+                </p>
+            </div>
+
+            <div class="card">
+                <p class="card-title">Jump FSR -1</p>
+                <p class="switch">
+                  <input type="checkbox" id="FSRN" onchange="toggleCheckboxFSRN(this)">
+                  <span class="slider"></span>
+                </p>
+            </div>
+
+            <div class="card">
                 <p class="card-title">Engage ramp</p>
                 <p class="switch">
                   <input type="checkbox" onchange="toggleCheckboxRampL1(this)">
@@ -78,17 +94,6 @@
                 <p class="card-title">Lock fail counter</p>
                 <div id="lock_fail_counter">0</div> <!-- Display counter value -->
             </div>
-
-            <div class="card">
-                <p class="card-title">Find next 00 mode</p>
-                <button id="pushButton" onclick="FSRP()">+</button>
-                <p id="FSRP"></p>
-                <div class="state">
-                <p>Status: <span id="JumpFSRstatus"></span></p>
-                </div> 
-            </div>
-
-
 
 
         </div>

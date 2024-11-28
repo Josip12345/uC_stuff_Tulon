@@ -38,8 +38,21 @@ function updateSliderPWM(element) {
     websocket.send(sliderNumber+"s"+sliderValue.toString());
 }
 
+// Function to toggle the FSRP checkbox
+function toggleCheckboxFSRP(checkbox) {
+  const isChecked = checkbox.checked;
+  const message = isChecked ? '1' : '0';
+  websocket.send("FSRP"+message);
+}
 
-// Function to toggle the checkbox 1
+// Function to toggle the FSRP checkbox
+function toggleCheckboxFSRN(checkbox) {
+  const isChecked = checkbox.checked;
+  const message = isChecked ? '1' : '0';
+  websocket.send("FSRN"+message);
+}
+
+// Function to toggle the relock checkbox
 function toggleCheckboxRelockL1(checkbox) {
   const isChecked = checkbox.checked;
   const message = isChecked ? '1' : '0';
@@ -47,20 +60,13 @@ function toggleCheckboxRelockL1(checkbox) {
 }
 
 
-// Function to toggle the checkbox 3
+// Function to toggle the ramp checkbox
 function toggleCheckboxRampL1(checkbox) {
   const isChecked = checkbox.checked;
   const message = isChecked ? '1' : '0';
   websocket.send("1RAM"+message);
 }
 
-let buttonState = false; // Initial state of the button
-
-//Function to toogle the state of the pushbutton for FSR jumping and send it to the websocket
-function FSRP() {
-
-    websocket.send("FSRP"+'1');
-}
 
 
 function onMessage(event) {
@@ -69,17 +75,15 @@ function onMessage(event) {
     var keys = Object.keys(myObj);
 
     for (var i = 0; i < keys.length; i++){
+        if (key == 'lock_fail_counter') {
+        document.getElementById('lock_fail_counter').innerText = myObj[key]; // Update the counter display
+        } else {
         var key = keys[i];
         document.getElementById(key).innerHTML = myObj[key];
         document.getElementById("slider"+ (i+1).toString()).value = myObj[key];
         // Check if the key is 'counter' and set the counter
-    if (key == 'lock_fail_counter') {
-        document.getElementById('lock_fail_counter').innerText = myObj[key]; // Update the counter display
     }
-    if (key == 'JumpFSRstatus') {
-        var statusElement = document.getElementById('JumpFSRstatus');
-        statusElement.textContent = myObj[key];
-    }
+ 
     }
 
 }

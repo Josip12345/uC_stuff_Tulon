@@ -282,12 +282,12 @@ void gen_relock_wave(){
   }
 
 
-void gen_next_FSR_wave(){
+void gen_next_FSR_wave(int direction){
   
-  // This routine generates piezo (fast) and LD (slow) waveforms for searching next 00 mode (going to the next FSR)
+  // This routine generates piezo (fast) and LD (slow) waveforms for searching next 00 mode (going to the next FSR) in the direction determined by direction argument: 
+  // direction = -1 -> going negative, direction = +1 -> going positive
   // Goes through a full period (2pi) of path lenght piezo phase by going through values in the respective lookup table and sends
   // those values to the respective trimpot via SPI bus
-  // It does that with the maximium loop execution speed (no timer involved)
   // Once it goes through a full piezo waveform period, it increases the value of the LD dig pot for the minimum amount, adding to the present LD offset value
 
   if (next_sample == 0){
@@ -297,7 +297,7 @@ void gen_next_FSR_wave(){
   }
   next_sample = 0; // Erase the timer flag
   
-  SampleIdx1_laser1 = SampleIdx1_laser1 + 1; // Outputing every thrid sample in from the sine30LookupTable
+  SampleIdx1_laser1 = SampleIdx1_laser1 + 1; 
   Piezo_relock_amp = int((sine30LookupTable[SampleIdx1_laser1]+DC_offset1)*amplitude1+rv); // Going through fast sine values, values from -128 to 128 are transposed to 0 to 255
   
   if(Piezo_relock_amp > 255){
@@ -310,8 +310,8 @@ void gen_next_FSR_wave(){
     
     // After completing a whole piezo waveform period
     // setting the next LD dig pot value, towards the next 00 mode
-    if(rv_LD<255){ // Like this we ensure that the current offset value does not revolve back to minimum due to the register overflow in the dig pot/SPI
-      rv_LD = rv_LD + 1; // Using the same variable as for the offset entered by the user, such that it is easier to update the respective offset web server slider afterwards
+    if((rv_LD<255) and (rv_LD>0)){ // Like this we ensure that the current offset value does not revolve back to minimum due to the register overflow in the dig pot/SPI
+      rv_LD = rv_LD + direction; // Using the same variable as for the offset entered by the user, such that it is easier to update the respective offset web server slider afterwards
     }
     spiCommand(hspi, 00, rv_LD); 
   }
@@ -378,7 +378,7 @@ int engage_ramp_laser1 = 0; // Flag that determines if the ramp waveform should 
                             // Apart from this flag to be 1, for the ramp to be outputed on laser 1, the engage_relock_track_laser1 flag should be 0.
 
 bool jump_FSRP = 0; // Flag that determines weather to jump one FSR in the LD current (frequency) increasing direction
- 
+bool jump_FSRN = 0; // Flag that determines weather to jump one FSR in the LD current (frequency) decreasing direction
 
 
 
@@ -396,6 +396,8 @@ String getSliderValues(){
   sliderValues["sliderValue5"] = String(sliderValue5);
   sliderValues["lock_fail_counter"] = String(lock_fail_counter);
   sliderValues["JumpFSRstatus"] = String(JumpFSRstatus);
+  sliderValues["FSRP"] = String(jump_FSRP);
+  sliderValues["FSRN"] = String(jump_FSRN);
   
   String jsonString = JSON.stringify(sliderValues);
   return jsonString;
@@ -459,7 +461,16 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       }
 
      if (message.indexOf("FSRP") >= 0){
-      jump_FSRP = true; //If FSRP button is clicked, then set FSRP flag to true. This indicates to the loop to go to the FSR jump positive routine
+      elp = message.substring(4);
+      jump_FSRP = elp.toInt(); //If FSRP checkbox is ticked, then set FSRP flag to true. This indicates to the loop to go to the FSR jump positive routine
+      
+      //Serial.println(switchStatus);  
+      }
+
+     if (message.indexOf("FSRN") >= 0){
+      elp = message.substring(4);
+      jump_FSRN = elp.toInt(); //If FSRN checkbox is ticked, then set FSRN flag to true. This indicates to the loop to go to the FSR jump negative routine
+      
       //Serial.println(switchStatus);  
       }
       
@@ -600,30 +611,33 @@ void loop() {
   Value_laser1 = analogRead(ADC1_CH5);
 
 
-if (jump_FSRP){
+if (jump_FSRP){ // If Jump FSR +1 checkbox is ticked
   SampleIdx2_laser1 = 0; // Resetting LD relock waveform to start from 0, next time re-lock is activated
                          // otherwise it could cause a too large jump of the LD current
-
-//  if (first_pass_flag==1){
-//    JumpFSRstatus = "Searching..."; // Set the find next 00 mode status in the web server to searching
-//    notifyClients(getSliderValues());
-//    first_pass_flag = 0; // Prohibit executing this status info communication more than once, by setting this flag to 0
-//    }
-//  if (rv_LD == 255){ // If LD offset value reches 255, witohut finding the next 00 mode, set the staatus to Not found
-//    JumpFSRstatus = "Not found"; // Set the find next 00 mode status in the web server to searching
-//    notifyClients(getSliderValues());
-//    first_pass_flag = 0; // Prohibit executing this status info communication more than once, by setting this flag to 0
-//    }
     
-  gen_next_FSR_wave();   // Generating next sample of the next 00 mode finding waveform
+  gen_next_FSR_wave(1);   // Generating next sample of the next 00 mode finding waveform
 
 
   if (Value_laser1 > threshold_engage1){ // If the next 00 mode is found
-    jump_FSRP = false; // Set this flag to false to stop searching for the next 00 mode
+    jump_FSRP = 0; // Set this flag to false to stop searching for the next 00 mode
 
     // Update the web server
     sliderValue5 = rv_LD; // Update the LD offset slider in the web server
-    JumpFSRstatus = "Found"; // Set the find next 00 mode status in the web server to found
+    notifyClients(getSliderValues());
+    }
+
+}else if (jump_FSRN){ // If Jump FSR -1 checkbox is ticked
+  SampleIdx2_laser1 = 0; // Resetting LD relock waveform to start from 0, next time re-lock is activated
+                         // otherwise it could cause a too large jump of the LD current
+    
+  gen_next_FSR_wave(-1);   // Generating next sample of the next 00 mode finding waveform
+
+
+  if (Value_laser1 > threshold_engage1){ // If the next 00 mode is found
+    jump_FSRN = 0; // Set this flag to false to stop searching for the next 00 mode
+
+    // Update the web server
+    sliderValue5 = rv_LD; // Update the LD offset slider in the web server
     notifyClients(getSliderValues());
     }
   
