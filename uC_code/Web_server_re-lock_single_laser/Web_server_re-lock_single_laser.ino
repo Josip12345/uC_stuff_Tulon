@@ -309,10 +309,18 @@ void gen_next_FSR_wave(int direction){
     SampleIdx1_laser1 = 0;
     
     // After completing a whole piezo waveform period
-    // setting the next LD dig pot value, towards the next 00 mode
-    if((rv_LD<255) and (rv_LD>0)){ // Like this we ensure that the current offset value does not revolve back to minimum due to the register overflow in the dig pot/SPI
-      rv_LD = rv_LD + direction; // Using the same variable as for the offset entered by the user, such that it is easier to update the respective offset web server slider afterwards
+    // Setting the next LD dig pot value, towards the next 00 mode
+      
+  rv_LD = rv_LD + direction; // Using the same variable as for the offset entered by the user, such that it is easier to update the respective offset web server slider afterwards
+      
+  // Like this we ensure that the current offset value does not revolve back to minimum due to the register overflow in the dig pot/SPI 
+  if(rv_LD>127){
+    rv_LD=127;
+    } 
+  if(rv_LD<18){ // It is 18 and not 0 due to the non-linearity caused by the parallel resistance of the offset diff amp input resistors
+    rv_LD=18;
     }
+    
     spiCommand(hspi, 00, rv_LD); 
   }
   
@@ -337,8 +345,8 @@ void gen_ramp(){
     toogle_laser1 = !toogle_laser1;
     digitalWrite(osci_trigger_laser1, toogle_laser1); // Generating a sync trigger signal for the oscilloscope
   }
-  if(ra > 255){
-    ra = 255;
+  if(ra > 127){
+    ra = 127;
   }else if (ra < 0){
     ra = 0;
   }
@@ -369,8 +377,10 @@ String sliderValue3 = "0";
 String sliderValue4 = "64";
 String sliderValue5 = "64";
 int lock_fail_counter = 0;
-String JumpFSRstatus = "Searching...";
 String elp = "0";
+String jump_FSRP_status = "SEARCH"; // Status of the jump FSRP routine: SEARCH or STOP
+                                    // I do not use jump_FSR variable routine for that to be able to change things in the web server in an uncoupled way to the ticked status
+String jump_FSRN_status = "SEARCH";// Status of the jump FSRN routine: SEARCH or STOP
 
 int engage_relock_track_laser1 = 0; // This flag determines if the laser 1 lock status should be tracked. Does not imply outputing relock waveforms.
 
@@ -395,9 +405,8 @@ String getSliderValues(){
   sliderValues["sliderValue4"] = String(sliderValue4);
   sliderValues["sliderValue5"] = String(sliderValue5);
   sliderValues["lock_fail_counter"] = String(lock_fail_counter);
-  sliderValues["JumpFSRstatus"] = String(JumpFSRstatus);
-  sliderValues["FSRP"] = String(jump_FSRP);
-  sliderValues["FSRN"] = String(jump_FSRN);
+  sliderValues["FSRP"] = String(jump_FSRP_status);
+  sliderValues["FSRN"] = String(jump_FSRN_status);
   
   String jsonString = JSON.stringify(sliderValues);
   return jsonString;
@@ -614,13 +623,14 @@ void loop() {
 if (jump_FSRP){ // If Jump FSR +1 checkbox is ticked
   SampleIdx2_laser1 = 0; // Resetting LD relock waveform to start from 0, next time re-lock is activated
                          // otherwise it could cause a too large jump of the LD current
+  jump_FSRP_status = "SEARCH"; // Change the jump_FSRP_status to search, not to untick the Jump FSR +1 checkbox
     
   gen_next_FSR_wave(1);   // Generating next sample of the next 00 mode finding waveform
 
 
   if (Value_laser1 > threshold_engage1){ // If the next 00 mode is found
     jump_FSRP = 0; // Set this flag to false to stop searching for the next 00 mode
-
+    jump_FSRP_status = "STOP"; // Also send stop message to untick the Jump FSR +1 checkbox
     // Update the web server
     sliderValue5 = rv_LD; // Update the LD offset slider in the web server
     notifyClients(getSliderValues());
@@ -629,13 +639,16 @@ if (jump_FSRP){ // If Jump FSR +1 checkbox is ticked
 }else if (jump_FSRN){ // If Jump FSR -1 checkbox is ticked
   SampleIdx2_laser1 = 0; // Resetting LD relock waveform to start from 0, next time re-lock is activated
                          // otherwise it could cause a too large jump of the LD current
+
+  jump_FSRN_status = "SEARCH"; // Change the jump_FSRP_status to search, not to untick the Jump FSR +1 checkbox
     
   gen_next_FSR_wave(-1);   // Generating next sample of the next 00 mode finding waveform
+  
 
 
   if (Value_laser1 > threshold_engage1){ // If the next 00 mode is found
     jump_FSRN = 0; // Set this flag to false to stop searching for the next 00 mode
-
+    jump_FSRN_status = "STOP"; // Also send stop message to untick the Jump FSR +1 checkbox
     // Update the web server
     sliderValue5 = rv_LD; // Update the LD offset slider in the web server
     notifyClients(getSliderValues());

@@ -64,7 +64,7 @@ function toggleCheckboxRelockL1(checkbox) {
 function toggleCheckboxRampL1(checkbox) {
   const isChecked = checkbox.checked;
   const message = isChecked ? '1' : '0';
-  websocket.send("1RAM"+message);
+  websocket.send("1RAM"+ message);
 }
 
 
@@ -75,15 +75,24 @@ function onMessage(event) {
     var keys = Object.keys(myObj);
 
     for (var i = 0; i < keys.length; i++){
-        if (key == 'lock_fail_counter') {
-        document.getElementById('lock_fail_counter').innerText = myObj[key]; // Update the counter display
-        } else {
         var key = keys[i];
+        if (key == 'lock_fail_counter') { // Check if the key is 'counter' and set the counter
+        document.getElementById('lock_fail_counter').innerText = myObj[key]; // Update the counter display
+        } else if (key == "FSRP") {
+            if (myObj[key] == "STOP"){
+           document.getElementById("FSRP").checked = false;
+            }
+        } else if (key == "FSRN") {
+             if (myObj[key] == "STOP"){
+           document.getElementById("FSRN").checked = false;
+            }
+        } else {
         document.getElementById(key).innerHTML = myObj[key];
         document.getElementById("slider"+ (i+1).toString()).value = myObj[key];
-        // Check if the key is 'counter' and set the counter
+ 
+        
     }
  
     }
-
 }
+
