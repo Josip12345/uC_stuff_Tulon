@@ -369,6 +369,7 @@ String sliderValue3 = "0";
 String sliderValue4 = "64";
 String sliderValue5 = "64";
 int lock_fail_counter = 0;
+String JumpFSRstatus = "Searching...";
 String elp = "0";
 
 int engage_relock_track_laser1 = 0; // This flag determines if the laser 1 lock status should be tracked. Does not imply outputing relock waveforms.
@@ -394,6 +395,7 @@ String getSliderValues(){
   sliderValues["sliderValue4"] = String(sliderValue4);
   sliderValues["sliderValue5"] = String(sliderValue5);
   sliderValues["lock_fail_counter"] = String(lock_fail_counter);
+  sliderValues["JumpFSRstatus"] = String(JumpFSRstatus);
   
   String jsonString = JSON.stringify(sliderValues);
   return jsonString;
@@ -585,6 +587,7 @@ void setup() {
 
 
 bool lock_fail_counter_flag = 1; //This flag indicates wheather to increase the re-lock couner or not
+short first_pass_flag = 1;
 
  
 int delta_millis = 0; 
@@ -600,13 +603,27 @@ void loop() {
 if (jump_FSRP){
   SampleIdx2_laser1 = 0; // Resetting LD relock waveform to start from 0, next time re-lock is activated
                          // otherwise it could cause a too large jump of the LD current
+
+//  if (first_pass_flag==1){
+//    JumpFSRstatus = "Searching..."; // Set the find next 00 mode status in the web server to searching
+//    notifyClients(getSliderValues());
+//    first_pass_flag = 0; // Prohibit executing this status info communication more than once, by setting this flag to 0
+//    }
+//  if (rv_LD == 255){ // If LD offset value reches 255, witohut finding the next 00 mode, set the staatus to Not found
+//    JumpFSRstatus = "Not found"; // Set the find next 00 mode status in the web server to searching
+//    notifyClients(getSliderValues());
+//    first_pass_flag = 0; // Prohibit executing this status info communication more than once, by setting this flag to 0
+//    }
+    
   gen_next_FSR_wave();   // Generating next sample of the next 00 mode finding waveform
+
 
   if (Value_laser1 > threshold_engage1){ // If the next 00 mode is found
     jump_FSRP = false; // Set this flag to false to stop searching for the next 00 mode
 
-    // Update the LD offset slider in the web server
-    sliderValue5 = rv_LD;
+    // Update the web server
+    sliderValue5 = rv_LD; // Update the LD offset slider in the web server
+    JumpFSRstatus = "Found"; // Set the find next 00 mode status in the web server to found
     notifyClients(getSliderValues());
     }
   

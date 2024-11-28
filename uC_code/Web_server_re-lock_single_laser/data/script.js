@@ -76,6 +76,10 @@ function onMessage(event) {
     if (key == 'lock_fail_counter') {
         document.getElementById('lock_fail_counter').innerText = myObj[key]; // Update the counter display
     }
+    if (key == 'JumpFSRstatus') {
+        var statusElement = document.getElementById('JumpFSRstatus');
+        statusElement.textContent = myObj[key];
+    }
     }
 
 }
