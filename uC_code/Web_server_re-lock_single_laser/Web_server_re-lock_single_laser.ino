@@ -623,6 +623,11 @@ void loop() {
 if (jump_FSRP){ // If Jump FSR +1 checkbox is ticked
   SampleIdx2_laser1 = 0; // Resetting LD relock waveform to start from 0, next time re-lock is activated
                          // otherwise it could cause a too large jump of the LD current
+
+  if (jump_FSRP_status == "STOP"){ // If this is true this means prior to arriving here the next 00 mode was found
+    rv_LD = rv_LD + 5;  // Then jump the LD current by a bit to escpae from the current FSR
+                        // Otherwise the lower condition Value_laser1 > threshold_engage1 would be satisfied and the thing would stuck at the current FSR
+    }                        
   jump_FSRP_status = "SEARCH"; // Change the jump_FSRP_status to search, not to untick the Jump FSR +1 checkbox
     
   gen_next_FSR_wave(1);   // Generating next sample of the next 00 mode finding waveform
@@ -639,6 +644,11 @@ if (jump_FSRP){ // If Jump FSR +1 checkbox is ticked
 }else if (jump_FSRN){ // If Jump FSR -1 checkbox is ticked
   SampleIdx2_laser1 = 0; // Resetting LD relock waveform to start from 0, next time re-lock is activated
                          // otherwise it could cause a too large jump of the LD current
+
+  if (jump_FSRN_status == "STOP"){ // If this is true this means prior to arriving here the next 00 mode was found
+    rv_LD = rv_LD - 5;  // Then jump the LD current by a bit to escpae from the current FSR
+                        // Otherwise the lower condition Value_laser1 > threshold_engage1 would be satisfied and the thing would stuck at the current FSR
+    } 
 
   jump_FSRN_status = "SEARCH"; // Change the jump_FSRP_status to search, not to untick the Jump FSR +1 checkbox
     
